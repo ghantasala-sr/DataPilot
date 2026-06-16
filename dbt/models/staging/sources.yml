@@ -1,0 +1,36 @@
+# dbt sources — raw dataset tables
+version: 2
+
+sources:
+  - name: datapilot_raw
+    database: "{{ var('project_id', target.project) }}"
+    schema: datapilot_raw
+    description: "Raw ingested data from Olist and synthetic sources."
+    tables:
+      - name: raw_orders
+        description: "Raw order records from Olist dataset."
+        columns:
+          - name: order_id
+            tests: [not_null]
+      - name: raw_order_items
+        description: "Raw order item records with prices and freight."
+      - name: raw_payments
+        description: "Raw payment records per order."
+      - name: raw_customers
+        description: "Raw customer records with location."
+      - name: raw_products
+        description: "Raw product catalog."
+      - name: raw_sellers
+        description: "Raw seller records."
+      - name: raw_reviews
+        description: "Raw customer review records."
+      - name: raw_geolocation
+        description: "Raw geolocation data by zip code prefix."
+      - name: raw_campaigns
+        description: "Synthetic marketing campaign records."
+      - name: raw_campaign_attribution
+        description: "Synthetic campaign-to-order attribution."
+      - name: raw_support_tickets
+        description: "Synthetic customer support tickets."
+      - name: raw_refund_reasons
+        description: "Synthetic refund reason records."

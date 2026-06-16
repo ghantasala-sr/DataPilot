@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+google-cloud-bigquery
+google-cloud-aiplatform
+google-cloud-logging
+google-cloud-secret-manager
+google-cloud-firestore
+firebase-admin
+pydantic
+pydantic-settings
+sqlglot
+python-dotenv
+tenacity
+pandas
+db-dtypes

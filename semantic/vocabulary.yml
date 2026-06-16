@@ -1,0 +1,88 @@
+# DataPilot Controlled Vocabulary
+# Maps business language to canonical terms with role-based defaults.
+
+terms:
+  sales:
+    canonical_term: revenue
+    definition: "Monetary value of completed orders"
+    domain: commercial
+    approved_meanings:
+      - gross_revenue
+      - net_revenue
+      - attributed_revenue
+    default_by_role:
+      sales_manager: gross_revenue
+      finance_analyst: net_revenue
+      marketing_manager: attributed_revenue
+
+  revenue:
+    canonical_term: revenue
+    definition: "Income from order transactions"
+    domain: commercial
+    approved_meanings:
+      - gross_revenue
+      - net_revenue
+      - attributed_revenue
+    default_by_role:
+      sales_manager: gross_revenue
+      finance_analyst: net_revenue
+      marketing_manager: attributed_revenue
+
+  orders:
+    canonical_term: orders
+    definition: "Customer purchase transactions"
+    domain: operations
+    approved_meanings:
+      - total_orders
+      - completed_orders
+      - cancelled_orders
+    default_by_role:
+      sales_manager: completed_orders
+      operations_manager: total_orders
+
+  customers:
+    canonical_term: customers
+    definition: "Unique purchasing accounts"
+    domain: commercial
+    approved_meanings:
+      - total_customers
+      - active_customers
+      - new_customers
+
+  delivery:
+    canonical_term: delivery
+    definition: "Order fulfillment and shipping"
+    domain: operations
+    approved_meanings:
+      - delivery_time
+      - delivery_delay
+      - on_time_delivery_rate
+
+  refund:
+    canonical_term: refund
+    definition: "Returned value to customer"
+    domain: finance
+    approved_meanings:
+      - refund_amount
+      - refund_rate
+      - refund_count
+
+  campaign:
+    canonical_term: campaign
+    definition: "Marketing initiative with tracked spend"
+    domain: marketing
+    approved_meanings:
+      - campaign_spend
+      - campaign_roi
+      - campaign_revenue
+
+synonyms:
+  income: revenue
+  turnover: revenue
+  bookings: orders
+  purchases: orders
+  buyers: customers
+  shipping: delivery
+  returns: refund
+  promotion: campaign
+  ad: campaign

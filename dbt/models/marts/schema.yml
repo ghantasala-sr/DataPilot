@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: dim_campaigns
+    description: "Marketing campaigns dimension"
+    columns:
+      - name: campaign_id
+        tests:
+          - unique
+          - not_null
+  - name: dim_customers
+    description: "Customers dimension"
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+  - name: fact_orders
+    description: "Orders fact table"
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+  - name: fact_order_items
+    description: "Order items fact table"
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: product_id
+        tests:
+          - not_null

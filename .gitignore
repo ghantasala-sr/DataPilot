@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+.venv-dbt/
+venv/
+env/
+
+# Node
+node_modules/
+.next/
+out/
+.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# GCP
+service-account-key.json
+*-credentials.json
+*.json.enc
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/profiles.yml
+dbt/.user.yml
+
+# Docker
+*.log
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+test-results.xml
+
+# Data files (too large for git)
+data/olist/*.csv
+data/synthetic/*.csv

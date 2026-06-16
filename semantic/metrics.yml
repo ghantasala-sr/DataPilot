@@ -1,0 +1,138 @@
+# DataPilot Metric Definitions
+# Each metric has a canonical SQL formula, owner team, and grain.
+
+metrics:
+  gross_revenue:
+    metric_name: gross_revenue
+    definition: "Total order value before refunds and discounts"
+    formula_sql: "SUM(fact_order_items.price)"
+    owner_team: Sales
+    grain: order_item
+    default_table: fact_order_items
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  net_revenue:
+    metric_name: net_revenue
+    definition: "Payment revenue after refunds"
+    formula_sql: "SUM(fact_payments.payment_value) - COALESCE(SUM(fact_refunds.refund_amount), 0)"
+    owner_team: Finance
+    grain: payment
+    default_table: fact_payments
+    default_date_column: payment_timestamp
+    status: approved
+
+  attributed_revenue:
+    metric_name: attributed_revenue
+    definition: "Campaign-attributed revenue based on attribution weights"
+    formula_sql: "SUM(fact_campaign_attribution.revenue_credit)"
+    owner_team: Marketing
+    grain: campaign_order
+    default_table: fact_campaign_attribution
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  total_orders:
+    metric_name: total_orders
+    definition: "Count of all orders regardless of status"
+    formula_sql: "COUNT(DISTINCT fact_orders.order_id)"
+    owner_team: Operations
+    grain: order
+    default_table: fact_orders
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  completed_orders:
+    metric_name: completed_orders
+    definition: "Count of delivered orders"
+    formula_sql: "COUNT(DISTINCT fact_orders.order_id)"
+    filter_condition: "fact_orders.order_status = 'delivered'"
+    owner_team: Sales
+    grain: order
+    default_table: fact_orders
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  average_order_value:
+    metric_name: average_order_value
+    definition: "Average revenue per order"
+    formula_sql: "SUM(fact_order_items.price) / COUNT(DISTINCT fact_orders.order_id)"
+    owner_team: Sales
+    grain: order
+    default_table: fact_order_items
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  delivery_delay_rate:
+    metric_name: delivery_delay_rate
+    definition: "Percentage of orders delivered after estimated date"
+    formula_sql: >
+      COUNTIF(fact_orders.order_delivered_customer_date > fact_orders.order_estimated_delivery_date)
+      / COUNT(DISTINCT fact_orders.order_id)
+    owner_team: Operations
+    grain: order
+    default_table: fact_orders
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  average_review_score:
+    metric_name: average_review_score
+    definition: "Average customer review rating (1-5)"
+    formula_sql: "AVG(fact_reviews.review_score)"
+    owner_team: Product
+    grain: review
+    default_table: fact_reviews
+    default_date_column: review_creation_date
+    status: approved
+
+  refund_rate:
+    metric_name: refund_rate
+    definition: "Percentage of orders with refunds"
+    formula_sql: >
+      COUNT(DISTINCT fact_refunds.order_id)
+      / COUNT(DISTINCT fact_orders.order_id)
+    owner_team: Finance
+    grain: order
+    default_table: fact_orders
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+  campaign_roi:
+    metric_name: campaign_roi
+    definition: "Return on investment for marketing campaigns"
+    formula_sql: "(SUM(fact_campaign_attribution.revenue_credit) - SUM(dim_campaigns.spend)) / SUM(dim_campaigns.spend)"
+    owner_team: Marketing
+    grain: campaign
+    default_table: fact_campaign_attribution
+    default_date_column: order_purchase_timestamp
+    status: approved
+
+# ─── Context Rules ──────────────────────────────────────────
+# When a question is ambiguous, the correct metric is selected
+# based on user role and trigger words.
+
+context_rules:
+  - metric_id: gross_revenue
+    user_role: sales_manager
+    trigger_words: [sales, revenue, income, bookings]
+    priority: 1
+
+  - metric_id: net_revenue
+    user_role: finance_analyst
+    trigger_words: [revenue, income, net, payment]
+    priority: 1
+
+  - metric_id: attributed_revenue
+    user_role: marketing_manager
+    trigger_words: [campaign revenue, attributed, campaign performance]
+    priority: 1
+
+  - metric_id: campaign_roi
+    user_role: marketing_manager
+    trigger_words: [ROI, return on investment, campaign efficiency]
+    priority: 1
+
+  - metric_id: delivery_delay_rate
+    user_role: operations_manager
+    trigger_words: [delay, late, shipping, delivery]
+    priority: 1

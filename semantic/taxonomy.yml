@@ -1,0 +1,50 @@
+# DataPilot Taxonomy — hierarchical classification of business domains.
+
+taxonomy:
+  commercial:
+    description: "Revenue, sales, and customer-facing metrics"
+    sub_domains:
+      - sales
+      - pricing
+      - customer_acquisition
+    related_entities: [Customer, Order, OrderItem, Product]
+
+  finance:
+    description: "Financial reporting, payments, and refunds"
+    sub_domains:
+      - payments
+      - refunds
+      - cost_accounting
+    related_entities: [Payment, Order]
+
+  operations:
+    description: "Fulfillment, delivery, and inventory"
+    sub_domains:
+      - delivery
+      - inventory
+      - warehouse
+    related_entities: [Order, Seller]
+
+  marketing:
+    description: "Campaigns, attribution, and channel performance"
+    sub_domains:
+      - campaigns
+      - attribution
+      - channel_analysis
+    related_entities: [Campaign, CampaignAttribution, Order]
+
+  product:
+    description: "Product catalog, quality, and reviews"
+    sub_domains:
+      - catalog
+      - reviews
+      - quality
+    related_entities: [Product, Review]
+
+  customer_experience:
+    description: "Support, satisfaction, and retention"
+    sub_domains:
+      - support
+      - satisfaction
+      - retention
+    related_entities: [Customer, Review, Order]

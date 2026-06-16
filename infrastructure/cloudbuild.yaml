@@ -1,0 +1,95 @@
+steps:
+  # ─── Run backend tests ──────────────────────────────────────
+  - name: 'python:3.11-slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd backend
+        pip install -r requirements.txt -r requirements-dev.txt
+        python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
+    id: 'backend-tests'
+
+  # ─── Run dbt tests ──────────────────────────────────────────
+  - name: 'ghcr.io/dbt-labs/dbt-bigquery:latest'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd dbt
+        dbt deps
+        dbt test --target staging
+    id: 'dbt-tests'
+
+  # ─── Build backend container ────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/datapilot-backend:${SHORT_SHA}'
+      - 'backend/'
+    id: 'build-backend'
+    waitFor: ['backend-tests']
+
+  # ─── Build frontend container ───────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/datapilot-frontend:${SHORT_SHA}'
+      - 'frontend/'
+    id: 'build-frontend'
+    waitFor: ['backend-tests']
+
+  # ─── Push backend image ─────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/datapilot-backend:${SHORT_SHA}'
+    id: 'push-backend'
+    waitFor: ['build-backend']
+
+  # ─── Push frontend image ────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/datapilot-frontend:${SHORT_SHA}'
+    id: 'push-frontend'
+    waitFor: ['build-frontend']
+
+  # ─── Deploy backend to Cloud Run ────────────────────────────
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'datapilot-backend'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/datapilot-backend:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    id: 'deploy-backend'
+    waitFor: ['push-backend', 'dbt-tests']
+
+  # ─── Deploy frontend to Cloud Run ───────────────────────────
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'datapilot-frontend'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/datapilot-frontend:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    id: 'deploy-frontend'
+    waitFor: ['push-frontend']
+
+substitutions:
+  _REGION: us-central1
+  _ARTIFACT_REPO: datapilot-containers
+
+options:
+  logging: CLOUD_LOGGING_ONLY

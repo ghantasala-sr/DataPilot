@@ -1,0 +1,87 @@
+# DataPilot Access Policies
+# Controls which roles can access which data objects.
+
+policies:
+  # ─── PII Column Restrictions ──────────────────────────────
+  - policy_id: pii_email
+    object_type: column
+    object_name: email
+    policy_type: pii_restriction
+    rule_expression: "Column contains personal email addresses"
+    allowed_roles: [admin, data_engineer]
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst, operations_manager]
+
+  - policy_id: pii_phone
+    object_type: column
+    object_name: phone
+    policy_type: pii_restriction
+    rule_expression: "Column contains personal phone numbers"
+    allowed_roles: [admin, data_engineer]
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst, operations_manager]
+
+  - policy_id: pii_address
+    object_type: column
+    object_name: address
+    policy_type: pii_restriction
+    rule_expression: "Column contains physical addresses"
+    allowed_roles: [admin, data_engineer]
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst, operations_manager]
+
+  - policy_id: pii_customer_name
+    object_type: column
+    object_name: customer_name
+    policy_type: pii_restriction
+    rule_expression: "Column contains full customer names"
+    allowed_roles: [admin, data_engineer, customer_success]
+    blocked_roles: [sales_manager, marketing_manager]
+
+  - policy_id: pii_payment_card
+    object_type: column
+    object_name: payment_card
+    policy_type: pii_restriction
+    rule_expression: "Column contains payment card information"
+    allowed_roles: [admin]
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst, operations_manager, data_engineer]
+
+  # ─── Dataset Restrictions ─────────────────────────────────
+  - policy_id: restrict_raw_dataset
+    object_type: dataset
+    object_name: datapilot_raw
+    policy_type: access_restriction
+    rule_expression: "Raw data should only be accessed by engineers"
+    allowed_roles: [admin, data_engineer]
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst, operations_manager]
+
+  - policy_id: restrict_observability
+    object_type: dataset
+    object_name: datapilot_observability
+    policy_type: access_restriction
+    rule_expression: "Observability data is internal only"
+    allowed_roles: [admin, data_engineer, platform_engineer]
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst]
+
+  # ─── Query Cost Limits ────────────────────────────────────
+  - policy_id: cost_limit_default
+    object_type: query
+    object_name: "*"
+    policy_type: cost_limit
+    rule_expression: "max_bytes_processed <= 10737418240"  # 10 GB
+    allowed_roles: [admin, data_engineer]
+    blocked_roles: []
+
+  - policy_id: cost_limit_business
+    object_type: query
+    object_name: "*"
+    policy_type: cost_limit
+    rule_expression: "max_bytes_processed <= 5368709120"  # 5 GB
+    allowed_roles: []
+    blocked_roles: [sales_manager, marketing_manager, finance_analyst]
+
+  # ─── Row Limit Enforcement ────────────────────────────────
+  - policy_id: row_limit_default
+    object_type: query
+    object_name: "*"
+    policy_type: row_limit
+    rule_expression: "LIMIT <= 1000"
+    allowed_roles: []
+    blocked_roles: []

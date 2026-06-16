@@ -1,0 +1,133 @@
+# DataPilot Ontology — Entities, relationships, and approved join paths.
+# The AI can ONLY use joins defined here. No invented join paths allowed.
+
+entities:
+  Customer:
+    table: dim_customers
+    dataset: datapilot_analytics
+    primary_key: customer_id
+    description: "Unique purchasing customer account"
+
+  Order:
+    table: fact_orders
+    dataset: datapilot_analytics
+    primary_key: order_id
+    description: "Customer purchase transaction"
+
+  OrderItem:
+    table: fact_order_items
+    dataset: datapilot_analytics
+    primary_key: [order_id, order_item_id]
+    description: "Individual line item within an order"
+
+  Product:
+    table: dim_products
+    dataset: datapilot_analytics
+    primary_key: product_id
+    description: "Product in the catalog"
+
+  Seller:
+    table: dim_sellers
+    dataset: datapilot_analytics
+    primary_key: seller_id
+    description: "Marketplace seller"
+
+  Payment:
+    table: fact_payments
+    dataset: datapilot_analytics
+    primary_key: [order_id, payment_sequential]
+    description: "Payment transaction for an order"
+
+  Review:
+    table: fact_reviews
+    dataset: datapilot_analytics
+    primary_key: review_id
+    description: "Customer review of an order"
+
+  Campaign:
+    table: dim_campaigns
+    dataset: datapilot_analytics
+    primary_key: campaign_id
+    description: "Marketing campaign"
+
+  CampaignAttribution:
+    table: fact_campaign_attribution
+    dataset: datapilot_analytics
+    primary_key: attribution_id
+    description: "Campaign-to-order revenue attribution"
+
+  Location:
+    table: dim_location
+    dataset: datapilot_analytics
+    primary_key: location_id
+    description: "Geographic location dimension"
+
+  Date:
+    table: dim_date
+    dataset: datapilot_analytics
+    primary_key: date_key
+    description: "Date dimension for time-based analysis"
+
+relationships:
+  customer_places_order:
+    from_entity: Customer
+    to_entity: Order
+    join_condition: "dim_customers.customer_id = fact_orders.customer_id"
+    cardinality: "1:N"
+    approved: true
+
+  order_contains_items:
+    from_entity: Order
+    to_entity: OrderItem
+    join_condition: "fact_orders.order_id = fact_order_items.order_id"
+    cardinality: "1:N"
+    approved: true
+
+  item_is_product:
+    from_entity: OrderItem
+    to_entity: Product
+    join_condition: "fact_order_items.product_id = dim_products.product_id"
+    cardinality: "N:1"
+    approved: true
+
+  item_sold_by_seller:
+    from_entity: OrderItem
+    to_entity: Seller
+    join_condition: "fact_order_items.seller_id = dim_sellers.seller_id"
+    cardinality: "N:1"
+    approved: true
+
+  order_has_payments:
+    from_entity: Order
+    to_entity: Payment
+    join_condition: "fact_orders.order_id = fact_payments.order_id"
+    cardinality: "1:N"
+    approved: true
+
+  order_has_reviews:
+    from_entity: Order
+    to_entity: Review
+    join_condition: "fact_orders.order_id = fact_reviews.order_id"
+    cardinality: "1:N"
+    approved: true
+
+  campaign_influences_order:
+    from_entity: Campaign
+    to_entity: CampaignAttribution
+    join_condition: "dim_campaigns.campaign_id = fact_campaign_attribution.campaign_id"
+    cardinality: "1:N"
+    approved: true
+
+  attribution_links_order:
+    from_entity: CampaignAttribution
+    to_entity: Order
+    join_condition: "fact_campaign_attribution.order_id = fact_orders.order_id"
+    cardinality: "N:1"
+    approved: true
+
+  customer_located_at:
+    from_entity: Customer
+    to_entity: Location
+    join_condition: "dim_customers.customer_zip_code_prefix = dim_location.zip_code_prefix"
+    cardinality: "N:1"
+    approved: true

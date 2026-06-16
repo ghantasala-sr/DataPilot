@@ -1,0 +1,133 @@
+# DataPilot Template Queries
+# Pre-approved SQL for common questions. Used as fallback when Gemini
+# is unavailable or when the question matches a known pattern.
+
+templates:
+  - template_id: tpl_monthly_revenue_by_category
+    template_name: "Monthly revenue by product category"
+    intent_name: aggregate_query
+    trigger_phrases:
+      - "monthly revenue by category"
+      - "revenue by product category"
+      - "sales by category per month"
+    sql_template: |
+      SELECT
+        FORMAT_DATE('%Y-%m', DATE(o.order_purchase_timestamp)) AS month,
+        p.product_category_name,
+        COUNT(DISTINCT o.order_id) AS total_orders,
+        SUM(oi.price) AS gross_revenue
+      FROM `{project}.datapilot_analytics.fact_orders` o
+      JOIN `{project}.datapilot_analytics.fact_order_items` oi
+        ON o.order_id = oi.order_id
+      LEFT JOIN `{project}.datapilot_analytics.dim_products` p
+        ON oi.product_id = p.product_id
+      WHERE o.order_status = 'delivered'
+      GROUP BY 1, 2
+      ORDER BY 1 DESC, 4 DESC
+      LIMIT 100
+    required_parameters: []
+    owner_team: Sales
+    approved: true
+
+  - template_id: tpl_top_states_by_sales
+    template_name: "Top states by sales"
+    intent_name: aggregate_query
+    trigger_phrases:
+      - "top states by sales"
+      - "revenue by state"
+      - "sales by region"
+    sql_template: |
+      SELECT
+        c.customer_state,
+        COUNT(DISTINCT o.order_id) AS total_orders,
+        SUM(oi.price) AS gross_revenue
+      FROM `{project}.datapilot_analytics.fact_orders` o
+      JOIN `{project}.datapilot_analytics.fact_order_items` oi
+        ON o.order_id = oi.order_id
+      LEFT JOIN `{project}.datapilot_analytics.dim_customers` c
+        ON o.customer_id = c.customer_id
+      WHERE o.order_status = 'delivered'
+      GROUP BY 1
+      ORDER BY 3 DESC
+      LIMIT 20
+    required_parameters: []
+    owner_team: Sales
+    approved: true
+
+  - template_id: tpl_campaign_roi
+    template_name: "Campaign ROI by channel"
+    intent_name: aggregate_query
+    trigger_phrases:
+      - "campaign ROI"
+      - "campaign performance"
+      - "ROI by channel"
+    sql_template: |
+      SELECT
+        c.channel,
+        c.campaign_name,
+        SUM(c.spend) AS total_spend,
+        SUM(ca.revenue_credit) AS attributed_revenue,
+        SAFE_DIVIDE(
+          SUM(ca.revenue_credit) - SUM(c.spend),
+          SUM(c.spend)
+        ) AS roi
+      FROM `{project}.datapilot_analytics.dim_campaigns` c
+      JOIN `{project}.datapilot_analytics.fact_campaign_attribution` ca
+        ON c.campaign_id = ca.campaign_id
+      GROUP BY 1, 2
+      ORDER BY 5 DESC
+      LIMIT 20
+    required_parameters: []
+    owner_team: Marketing
+    approved: true
+
+  - template_id: tpl_delivery_delays
+    template_name: "Delivery delays by state"
+    intent_name: aggregate_query
+    trigger_phrases:
+      - "delivery delays"
+      - "late deliveries"
+      - "delayed deliveries by state"
+    sql_template: |
+      SELECT
+        c.customer_state,
+        COUNT(DISTINCT o.order_id) AS total_orders,
+        COUNTIF(o.order_delivered_customer_date > o.order_estimated_delivery_date) AS delayed_orders,
+        SAFE_DIVIDE(
+          COUNTIF(o.order_delivered_customer_date > o.order_estimated_delivery_date),
+          COUNT(DISTINCT o.order_id)
+        ) AS delay_rate
+      FROM `{project}.datapilot_analytics.fact_orders` o
+      LEFT JOIN `{project}.datapilot_analytics.dim_customers` c
+        ON o.customer_id = c.customer_id
+      WHERE o.order_status = 'delivered'
+        AND o.order_delivered_customer_date IS NOT NULL
+      GROUP BY 1
+      ORDER BY 4 DESC
+      LIMIT 20
+    required_parameters: []
+    owner_team: Operations
+    approved: true
+
+  - template_id: tpl_top_products_by_revenue
+    template_name: "Top products by revenue"
+    intent_name: aggregate_query
+    trigger_phrases:
+      - "top products"
+      - "best selling products"
+      - "top 10 products by revenue"
+    sql_template: |
+      SELECT
+        p.product_category_name,
+        p.product_id,
+        COUNT(DISTINCT oi.order_id) AS order_count,
+        SUM(oi.price) AS gross_revenue
+      FROM `{project}.datapilot_analytics.fact_order_items` oi
+      LEFT JOIN `{project}.datapilot_analytics.dim_products` p
+        ON oi.product_id = p.product_id
+      GROUP BY 1, 2
+      ORDER BY 4 DESC
+      LIMIT 10
+    required_parameters: []
+    owner_team: Product
+    approved: true

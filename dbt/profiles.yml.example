@@ -1,0 +1,27 @@
+# dbt profiles.yml — DO NOT commit this file.
+# Copy to ~/.dbt/profiles.yml and fill in your project ID.
+
+datapilot:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth  # or service-account
+      project: "your-gcp-project-id"
+      dataset: datapilot_staging
+      location: US
+      threads: 4
+      timeout_seconds: 300
+      # For service account auth, uncomment:
+      # method: service-account
+      # keyfile: /path/to/service-account-key.json
+
+    staging:
+      type: bigquery
+      method: service-account
+      project: "your-gcp-project-id"
+      dataset: datapilot_staging
+      location: US
+      threads: 4
+      timeout_seconds: 300
+      keyfile: /path/to/service-account-key.json
