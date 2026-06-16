@@ -69,7 +69,7 @@ gcloud run deploy datapilot-frontend \
   --region "${REGION}" \
   --platform managed \
   --allow-unauthenticated \
-  --set-env-vars "NEXT_PUBLIC_API_URL=${BACKEND_URL}" \
+  --set-env-vars "API_URL=${BACKEND_URL},NEXT_PUBLIC_API_URL=${BACKEND_URL}" \
   --memory 512Mi \
   --cpu 1 \
   --timeout 30 \

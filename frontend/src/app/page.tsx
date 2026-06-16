@@ -161,7 +161,7 @@ export default function Home() {
   const rows = result?.rows?.length ? result.rows : result?.results_summary ? [] : demoRows;
   const sql = result?.sql_generated || result?.sql || '';
   const answer = result?.explanation || result?.answer || result?.message;
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+  const apiBase = 'same-origin /api/query';
 
   const handleQuery = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -171,7 +171,7 @@ export default function Home() {
     setFeedback(null);
 
     try {
-      const response = await fetch(`${apiBase.replace(/\/$/, '')}/api/query`, {
+      const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
