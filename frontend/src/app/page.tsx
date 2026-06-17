@@ -362,8 +362,6 @@ export default function Home() {
       }
 
       setResult(nextResult);
-      const recommendedMode = nextResult.recommended_visualization?.type ?? nextResult.plan?.visualization?.type;
-      if (recommendedMode) setVizMode(recommendedMode);
       setMessages((items) => [
         ...items,
         {
