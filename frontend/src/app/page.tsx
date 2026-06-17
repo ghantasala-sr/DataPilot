@@ -112,6 +112,21 @@ function normalizeResult(payload: unknown): QueryResult {
   };
 }
 
+function parseApiPayload(text: string): unknown {
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      status: 'error',
+      message: text,
+      fallback_used: true,
+      fallback_type: 'frontend_non_json_response',
+    };
+  }
+}
+
 function formatCell(value: CellValue) {
   if (value === null) return 'null';
   if (typeof value === 'number') {
@@ -158,7 +173,7 @@ export default function Home() {
     window.localStorage.setItem('datapilot-query-history', JSON.stringify(history.slice(0, 8)));
   }, [history]);
 
-  const rows = result?.rows?.length ? result.rows : result?.results_summary ? [] : demoRows;
+  const rows = result ? result.rows ?? [] : demoRows;
   const sql = result?.sql_generated || result?.sql || '';
   const answer = result?.explanation || result?.answer || result?.message;
   const apiBase = 'same-origin /api/query';
@@ -187,7 +202,7 @@ export default function Home() {
       });
 
       const text = await response.text();
-      const parsed: unknown = text ? JSON.parse(text) : {};
+      const parsed = parseApiPayload(text);
       const nextResult = normalizeResult(parsed);
 
       if (!response.ok) {

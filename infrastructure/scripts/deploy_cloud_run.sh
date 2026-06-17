@@ -72,7 +72,7 @@ gcloud run deploy datapilot-frontend \
   --set-env-vars "API_URL=${BACKEND_URL},NEXT_PUBLIC_API_URL=${BACKEND_URL}" \
   --memory 512Mi \
   --cpu 1 \
-  --timeout 30 \
+  --timeout 120 \
   --max-instances 5 \
   --quiet
 

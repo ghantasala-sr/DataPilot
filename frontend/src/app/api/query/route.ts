@@ -14,11 +14,24 @@ export async function POST(request: NextRequest) {
     });
 
     const text = await response.text();
+    const contentType = response.headers.get('Content-Type') || '';
+
+    if (!contentType.includes('application/json')) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          message: text || `Backend returned HTTP ${response.status}.`,
+          fallback_used: true,
+          fallback_type: 'frontend_proxy_non_json',
+        },
+        { status: response.status },
+      );
+    }
 
     return new NextResponse(text, {
       status: response.status,
       headers: {
-        'Content-Type': response.headers.get('Content-Type') || 'application/json',
+        'Content-Type': contentType,
       },
     });
   } catch (error) {
