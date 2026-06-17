@@ -53,3 +53,6 @@ def test_query_endpoint_uses_local_mock_auth_and_template_fallback(monkeypatch):
     assert "SELECT" in payload["sql"]
     assert payload["rows_returned"] == 1
     assert payload["assumptions"]
+    assert payload["plan"]["steps"]
+    assert payload["complexity"] in {"simple", "compound", "investigative", "standard"}
+    assert any(agent["agent"] == "Planning Agent" for agent in payload["agents"])

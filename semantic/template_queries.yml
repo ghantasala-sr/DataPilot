@@ -112,6 +112,96 @@ templates:
     owner_team: Operations
     approved: true
 
+  - template_id: tpl_revenue_change_drivers_by_state_month
+    template_name: "Month-over-month revenue change drivers by customer state"
+    intent_name: diagnostic_query
+    trigger_phrases:
+      - "gross revenue change month over month by customer state"
+      - "revenue change month over month by customer state"
+      - "explained more by order volume product category mix or delivery delays"
+      - "revenue change by state drivers"
+      - "what drove revenue change by state"
+    sql_template: |
+      WITH monthly AS (
+        SELECT
+          FORMAT_DATE('%Y-%m', DATE(o.order_purchase_timestamp)) AS month,
+          c.customer_state,
+          COUNT(DISTINCT o.order_id) AS total_orders,
+          COUNT(DISTINCT COALESCE(p.product_category_name_english, p.product_category_name)) AS active_product_categories,
+          SUM(oi.price) AS gross_revenue,
+          SAFE_DIVIDE(
+            COUNTIF(o.order_delivered_customer_date > o.order_estimated_delivery_date),
+            COUNT(DISTINCT o.order_id)
+          ) AS delay_rate
+        FROM `{project}.datapilot_analytics.fact_orders` o
+        JOIN `{project}.datapilot_analytics.fact_order_items` oi
+          ON o.order_id = oi.order_id
+        LEFT JOIN `{project}.datapilot_analytics.dim_products` p
+          ON oi.product_id = p.product_id
+        LEFT JOIN `{project}.datapilot_analytics.dim_customers` c
+          ON o.customer_id = c.customer_id
+        WHERE o.order_status = 'delivered'
+          AND o.order_purchase_timestamp IS NOT NULL
+          AND c.customer_state IS NOT NULL
+        GROUP BY 1, 2
+      ),
+      with_lag AS (
+        SELECT
+          month,
+          customer_state,
+          gross_revenue,
+          LAG(gross_revenue) OVER (PARTITION BY customer_state ORDER BY month) AS previous_gross_revenue,
+          total_orders,
+          LAG(total_orders) OVER (PARTITION BY customer_state ORDER BY month) AS previous_total_orders,
+          active_product_categories,
+          LAG(active_product_categories) OVER (PARTITION BY customer_state ORDER BY month) AS previous_product_categories,
+          delay_rate,
+          LAG(delay_rate) OVER (PARTITION BY customer_state ORDER BY month) AS previous_delay_rate
+        FROM monthly
+      ),
+      drivers AS (
+        SELECT
+          month,
+          customer_state,
+          gross_revenue,
+          previous_gross_revenue,
+          gross_revenue - previous_gross_revenue AS revenue_change,
+          total_orders,
+          total_orders - previous_total_orders AS order_volume_change,
+          active_product_categories,
+          active_product_categories - previous_product_categories AS product_category_mix_change,
+          delay_rate,
+          delay_rate - previous_delay_rate AS delay_rate_change
+        FROM with_lag
+        WHERE previous_gross_revenue IS NOT NULL
+      )
+      SELECT
+        month,
+        customer_state,
+        gross_revenue,
+        previous_gross_revenue,
+        revenue_change,
+        total_orders,
+        order_volume_change,
+        active_product_categories,
+        product_category_mix_change,
+        delay_rate,
+        delay_rate_change,
+        CASE
+          WHEN ABS(order_volume_change) >= ABS(product_category_mix_change)
+            AND ABS(order_volume_change) >= ABS(delay_rate_change * 1000)
+            THEN 'order_volume'
+          WHEN ABS(product_category_mix_change) >= ABS(delay_rate_change * 1000)
+            THEN 'product_category_mix'
+          ELSE 'delivery_delay_rate'
+        END AS primary_driver
+      FROM drivers
+      ORDER BY ABS(revenue_change) DESC
+      LIMIT 50
+    required_parameters: []
+    owner_team: Sales
+    approved: true
+
   - template_id: tpl_top_products_by_revenue
     template_name: "Top products by revenue"
     intent_name: aggregate_query

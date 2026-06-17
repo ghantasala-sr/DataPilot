@@ -31,6 +31,10 @@ class QueryResponse(BaseModel):
     metric_used: str | None = None
     assumptions: list[str] = Field(default_factory=list)
     freshness: dict | None = None
+    plan: dict | None = None
+    agents: list[dict] = Field(default_factory=list)
+    complexity: str | None = None
+    recommended_visualization: dict | None = None
     fallback_used: bool = False
     fallback_type: str | None = None
     execution_time_ms: int = 0

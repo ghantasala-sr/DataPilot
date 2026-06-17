@@ -12,6 +12,35 @@ type Freshness = {
   message?: string;
 };
 
+type RecommendedVisualization = {
+  type?: VizMode;
+  reason?: string;
+  x?: string;
+  y?: string;
+  geo?: string;
+};
+
+type QueryPlan = {
+  complexity?: string;
+  strategy?: string;
+  steps?: string[];
+  required_tables?: string[];
+  metrics?: string[];
+  grain?: string;
+  filters?: string[];
+  visualization?: RecommendedVisualization;
+  policy_count?: number;
+  template_id?: string | null;
+};
+
+type AgentStep = {
+  agent?: string;
+  role?: string;
+  status?: string;
+  summary?: string;
+  evidence?: string[];
+};
+
 type QueryResult = {
   status?: 'success' | 'error' | string;
   query_id?: string;
@@ -22,6 +51,10 @@ type QueryResult = {
   metric_used?: string | null;
   assumptions?: string[];
   freshness?: Freshness | null;
+  plan?: QueryPlan | null;
+  agents?: AgentStep[];
+  complexity?: string | null;
+  recommended_visualization?: RecommendedVisualization | null;
   fallback_used?: boolean;
   fallback_type?: string | null;
   execution_time_ms?: number;
@@ -50,6 +83,7 @@ const sampleQuestions = [
   'What was monthly revenue by product category?',
   'Which campaign had the highest ROI?',
   'Show delivery delay rate by customer state.',
+  'Why did gross revenue change month over month by customer state, and is the change explained more by order volume, product category mix, or delivery delays?',
 ];
 
 const demoRows: QueryRow[] = [
@@ -77,6 +111,56 @@ function normalizeRows(rows: unknown): QueryRow[] {
     );
 }
 
+function normalizeStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function normalizeVisualization(value: unknown): RecommendedVisualization | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const type = typeof raw.type === 'string' && ['chart', 'map', 'table'].includes(raw.type) ? (raw.type as VizMode) : undefined;
+
+  return {
+    type,
+    reason: typeof raw.reason === 'string' ? raw.reason : undefined,
+    x: typeof raw.x === 'string' ? raw.x : undefined,
+    y: typeof raw.y === 'string' ? raw.y : undefined,
+    geo: typeof raw.geo === 'string' ? raw.geo : undefined,
+  };
+}
+
+function normalizePlan(value: unknown): QueryPlan | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+
+  return {
+    complexity: typeof raw.complexity === 'string' ? raw.complexity : undefined,
+    strategy: typeof raw.strategy === 'string' ? raw.strategy : undefined,
+    steps: normalizeStringList(raw.steps),
+    required_tables: normalizeStringList(raw.required_tables),
+    metrics: normalizeStringList(raw.metrics),
+    grain: typeof raw.grain === 'string' ? raw.grain : undefined,
+    filters: normalizeStringList(raw.filters),
+    visualization: normalizeVisualization(raw.visualization) ?? undefined,
+    policy_count: typeof raw.policy_count === 'number' ? raw.policy_count : undefined,
+    template_id: typeof raw.template_id === 'string' ? raw.template_id : null,
+  };
+}
+
+function normalizeAgents(value: unknown): AgentStep[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+    .map((item) => ({
+      agent: typeof item.agent === 'string' ? item.agent : undefined,
+      role: typeof item.role === 'string' ? item.role : undefined,
+      status: typeof item.status === 'string' ? item.status : undefined,
+      summary: typeof item.summary === 'string' ? item.summary : undefined,
+      evidence: normalizeStringList(item.evidence),
+    }));
+}
+
 function normalizeResult(payload: unknown): QueryResult {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return { status: 'error', message: 'The API returned an unsupported response.' };
@@ -91,6 +175,8 @@ function normalizeResult(payload: unknown): QueryResult {
     data.freshness && typeof data.freshness === 'object' && !Array.isArray(data.freshness)
       ? (data.freshness as Freshness)
       : null;
+  const plan = normalizePlan(data.plan);
+  const recommendedVisualization = normalizeVisualization(data.recommended_visualization) ?? plan?.visualization ?? null;
 
   return {
     status: typeof data.status === 'string' ? data.status : 'success',
@@ -102,6 +188,10 @@ function normalizeResult(payload: unknown): QueryResult {
     metric_used: typeof data.metric_used === 'string' ? data.metric_used : null,
     assumptions,
     freshness,
+    plan,
+    agents: normalizeAgents(data.agents),
+    complexity: typeof data.complexity === 'string' ? data.complexity : plan?.complexity ?? null,
+    recommended_visualization: recommendedVisualization,
     fallback_used: typeof data.fallback_used === 'boolean' ? data.fallback_used : false,
     fallback_type: typeof data.fallback_type === 'string' ? data.fallback_type : null,
     execution_time_ms: typeof data.execution_time_ms === 'number' ? data.execution_time_ms : undefined,
@@ -194,7 +284,9 @@ function summarizeForChat(result: QueryResult) {
 
   const rows = typeof result.rows_returned === 'number' ? `${result.rows_returned} rows` : 'results';
   const cost = typeof result.estimated_cost_usd === 'number' ? `$${result.estimated_cost_usd.toFixed(6)}` : '$0.000000';
-  return `Completed. ${rows} returned, estimated query cost ${cost}.`;
+  const complexity = result.complexity ? `${result.complexity} plan` : 'governed plan';
+  const agentCount = result.agents?.length ? `${result.agents.length} agents` : 'agents';
+  return `Completed with ${complexity}. ${rows} returned, ${agentCount} checked it, estimated query cost ${cost}.`;
 }
 
 export default function Home() {
@@ -270,6 +362,8 @@ export default function Home() {
       }
 
       setResult(nextResult);
+      const recommendedMode = nextResult.recommended_visualization?.type ?? nextResult.plan?.visualization?.type;
+      if (recommendedMode) setVizMode(recommendedMode);
       setMessages((items) => [
         ...items,
         {
@@ -344,6 +438,7 @@ export default function Home() {
 
           <aside className="min-w-0 space-y-5">
             <RunStatus result={result} />
+            <PlanningPanel result={result} loading={loading} />
             <SemanticPanel result={result} />
             <SqlPanel sql={sql} />
             <FeedbackButtons feedback={feedback} setFeedback={setFeedback} disabled={!result} />
@@ -549,6 +644,7 @@ function VisualizationAgent({
   const labelColumn = inferLabelColumn(rows);
   const valueColumn = inferNumberColumn(rows);
   const hasRows = rows.length > 0;
+  const recommendation = result?.recommended_visualization ?? result?.plan?.visualization;
 
   return (
     <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
@@ -588,7 +684,7 @@ function VisualizationAgent({
       <div className="border-t border-[var(--line)] px-5 py-3 text-xs text-[var(--muted)]">
         {result?.status === 'error'
           ? 'Visualization paused until the query succeeds.'
-          : 'Agent chooses dimensions from returned fields; switch modes to inspect shape and geography.'}
+          : recommendation?.reason || 'Agent chooses dimensions from returned fields; switch modes to inspect shape and geography.'}
       </div>
     </section>
   );
@@ -752,6 +848,82 @@ function RunStatus({ result }: { result: QueryResult | null }) {
         <StatusRow label="Cost" value={`$${(result?.estimated_cost_usd ?? 0).toFixed(6)}`} />
       </div>
     </section>
+  );
+}
+
+function PlanningPanel({ result, loading }: { result: QueryResult | null; loading: boolean }) {
+  const plan = result?.plan;
+  const agents = result?.agents?.length ? result.agents : [];
+  const tables = plan?.required_tables?.length ? plan.required_tables : ['awaiting table plan'];
+  const metrics = plan?.metrics?.length ? plan.metrics : ['awaiting metric plan'];
+  const visibleAgents = agents.slice(0, 6);
+
+  return (
+    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--ink)]">Planning agents</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            {loading
+              ? 'Planning query route'
+              : plan?.strategy || 'The plan appears after the first governed query.'}
+          </p>
+        </div>
+        <StatusBadge tone={result?.status === 'error' ? 'danger' : plan ? 'ok' : 'neutral'} label={plan?.complexity || 'idle'} />
+      </div>
+
+      <div className="mb-4 grid grid-cols-2 gap-2 text-xs">
+        <MiniStat label="Grain" value={plan?.grain || 'pending'} />
+        <MiniStat label="Visual" value={plan?.visualization?.type || result?.recommended_visualization?.type || 'pending'} />
+      </div>
+
+      <div className="mb-4 space-y-3">
+        <TagGroup label="Tables" values={tables} />
+        <TagGroup label="Metrics" values={metrics} />
+      </div>
+
+      <div className="space-y-3">
+        {visibleAgents.length ? (
+          visibleAgents.map((agent) => (
+            <div key={`${agent.agent}-${agent.summary}`} className="border-l-2 border-[var(--accent)] pl-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-[var(--ink)]">{agent.agent || 'Agent'}</p>
+                <span className="text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{agent.status || 'ready'}</span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-[var(--body)]">{agent.summary || agent.role || 'Waiting for query execution.'}</p>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-md bg-[var(--mist)] p-3 text-sm text-[var(--muted)]">
+            Planner, semantic, SQL, guardrails, warehouse, visualization, and explanation agents will report here.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-[var(--mist)] p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{label}</p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">{value}</p>
+    </div>
+  );
+}
+
+function TagGroup({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {values.slice(0, 5).map((value) => (
+          <span key={value} className="rounded-full border border-[var(--line)] bg-[var(--mist)] px-2 py-1 text-xs text-[var(--body)]">
+            {value.replaceAll('_', ' ')}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -57,6 +57,8 @@ DataPilot uses an ontology-aware query lifecycle:
 ```text
 User Question
     ↓
+Planning Agent Decomposition
+    ↓
 Intent Classification
     ↓
 Semantic Understanding
@@ -102,8 +104,10 @@ The final response includes:
 ```text
 Answer
 Generated SQL
+Planning agent trace
 Metric definition used
 Semantic assumptions
+Recommended visualization
 Data freshness status
 Fallback status
 Execution time
@@ -271,6 +275,31 @@ Role is passed to the semantic layer for metric and policy resolution
 ```
 
 This prevents privilege escalation. A user cannot self-declare their role to access restricted data or bypass PII policies.
+
+### 4.8 Multi-Agent Query Planning
+
+DataPilot now returns a visible agent trace for each governed query.
+
+```text
+Planning Agent
+Semantic Agent
+SQL Agent
+Guardrails Agent
+Warehouse Agent
+Visualization Agent
+Explanation Agent
+Recovery Agent
+```
+
+The Planning Agent decomposes complicated questions into metric, grain, required tables, filters, comparison logic, and visualization fit before SQL is selected. If the request matches an approved template, DataPilot uses that template first; otherwise, Gemini receives only the approved schema and semantic context.
+
+Example complicated question:
+
+```text
+Why did gross revenue change month over month by customer state, and is the change explained more by order volume, product category mix, or delivery delays?
+```
+
+For this diagnostic question, DataPilot uses an approved BigQuery template that compares month-over-month gross revenue by customer state and surfaces order volume change, product category mix change, delivery delay rate change, and a primary driver field. The response includes `plan`, `agents`, `complexity`, and `recommended_visualization` so the frontend can show the reasoning path, map/table/chart recommendation, and execution status.
 
 ---
 
@@ -717,6 +746,23 @@ Response:
   "answer": "Texas sales dropped 18.4% last week, mainly due to lower electronics orders in Dallas and Austin.",
   "sql": "SELECT ...",
   "metric_used": "gross_revenue",
+  "complexity": "investigative",
+  "plan": {
+    "grain": "month x customer_state",
+    "required_tables": ["fact_orders", "fact_order_items", "dim_products", "dim_customers"],
+    "metrics": ["gross_revenue", "order_count", "delivery_delay_rate"]
+  },
+  "agents": [
+    {
+      "agent": "Planning Agent",
+      "status": "completed",
+      "summary": "Investigative plan across 4 table(s) at month x customer_state grain."
+    }
+  ],
+  "recommended_visualization": {
+    "type": "map",
+    "reason": "The question includes a geographic state dimension."
+  },
   "assumptions": [
     "\"Sales\" means gross order revenue.",
     "Cancelled orders were excluded.",

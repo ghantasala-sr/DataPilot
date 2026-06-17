@@ -143,11 +143,16 @@ class SemanticResolver:
         """Find a pre-approved template using configured trigger phrases."""
         normalized = question.lower()
         templates = self.templates.get('templates', [])
+        best_match: Optional[Dict[str, Any]] = None
+        best_trigger_length = 0
         for template in templates:
             triggers = template.get("trigger_phrases", [])
-            if any(trigger.lower() in normalized for trigger in triggers):
-                return template
-        return None
+            for trigger in triggers:
+                trigger_normalized = trigger.lower()
+                if trigger_normalized in normalized and len(trigger_normalized) > best_trigger_length:
+                    best_match = template
+                    best_trigger_length = len(trigger_normalized)
+        return best_match
 
     def resolve_metric_for_question(self, question: str, role: str) -> Optional[Dict[str, Any]]:
         """Resolve the best metric using role defaults and context trigger rules."""

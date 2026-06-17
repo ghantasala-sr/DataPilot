@@ -9,6 +9,7 @@ from app.config import settings
 from app.semantic.resolver import resolver
 from app.guardrails.validator import validator
 from app.guardrails.executor import executor
+from app.orchestrator.agents import agent_coordinator
 
 
 class QueryOrchestrator:
@@ -30,6 +31,8 @@ class QueryOrchestrator:
         assumptions = self._build_assumptions(metric, policies)
 
         template = self.resolver.match_template(user_query)
+        plan = agent_coordinator.build_plan(user_query, metric, policies, template)
+        agent_trace = agent_coordinator.initial_trace(plan, metric, policies, template)
         fallback_used = False
         fallback_type = None
         intent = template.get("intent_name") if template else None
@@ -49,6 +52,8 @@ class QueryOrchestrator:
                         started_at,
                         metric,
                         assumptions,
+                        plan,
+                        agent_trace,
                     )
 
                 schema_context = self._schema_context(project)
@@ -62,6 +67,8 @@ class QueryOrchestrator:
                     started_at,
                     metric,
                     assumptions,
+                    plan,
+                    agent_trace,
                     fallback_used=True,
                     fallback_type="generation_unavailable",
                 )
@@ -74,6 +81,8 @@ class QueryOrchestrator:
                 started_at,
                 metric,
                 assumptions,
+                plan,
+                agent_trace,
                 sql=clean_sql,
                 fallback_used=fallback_used,
                 fallback_type=fallback_type,
@@ -87,6 +96,8 @@ class QueryOrchestrator:
                 started_at,
                 metric,
                 assumptions,
+                plan,
+                agent_trace,
                 sql=clean_sql,
                 fallback_used=fallback_used,
                 fallback_type=fallback_type,
@@ -100,6 +111,8 @@ class QueryOrchestrator:
                 started_at,
                 metric,
                 assumptions,
+                plan,
+                agent_trace,
                 sql=clean_sql,
                 fallback_used=True,
                 fallback_type=fallback_type or "bigquery_dry_run_unavailable",
@@ -113,6 +126,8 @@ class QueryOrchestrator:
                 started_at,
                 metric,
                 assumptions,
+                plan,
+                agent_trace,
                 sql=clean_sql,
                 bytes_processed=cost_estimate.get("bytes_processed", 0),
                 estimated_cost_usd=cost_estimate.get("estimated_cost_usd", 0.0),
@@ -121,6 +136,14 @@ class QueryOrchestrator:
             )
 
         explanation = self._explain(user_query, clean_sql, results_summary)
+        agents = agent_coordinator.final_trace(
+            agent_trace,
+            cost_estimate,
+            rows or [],
+            fallback_type,
+            explanation,
+            plan.get("visualization", {}),
+        )
         return {
             "status": "success",
             "query_id": query_id,
@@ -132,6 +155,10 @@ class QueryOrchestrator:
             "metric_used": metric.get("metric_name") if metric else None,
             "assumptions": assumptions,
             "freshness": {"status": "not_checked", "message": "Freshness observability starts in Phase 7."},
+            "plan": plan,
+            "agents": agents,
+            "complexity": plan.get("complexity"),
+            "recommended_visualization": plan.get("visualization"),
             "fallback_used": fallback_used,
             "fallback_type": fallback_type,
             "execution_time_ms": self._elapsed_ms(started_at),
@@ -160,7 +187,7 @@ class QueryOrchestrator:
         return f"""
         Table: `{project}.datapilot_analytics.dim_customers` (customer_id STRING, customer_state STRING)
         Table: `{project}.datapilot_analytics.dim_products` (product_id STRING, product_category_name STRING, product_category_name_english STRING)
-        Table: `{project}.datapilot_analytics.fact_orders` (order_id STRING, customer_id STRING, order_status STRING, order_purchase_timestamp TIMESTAMP)
+        Table: `{project}.datapilot_analytics.fact_orders` (order_id STRING, customer_id STRING, order_status STRING, order_purchase_timestamp TIMESTAMP, order_delivered_customer_date TIMESTAMP, order_estimated_delivery_date TIMESTAMP)
         Table: `{project}.datapilot_analytics.fact_order_items` (order_id STRING, product_id STRING, seller_id STRING, price FLOAT64, freight_value FLOAT64)
         Table: `{project}.datapilot_analytics.dim_campaigns` (campaign_id STRING, campaign_name STRING, channel STRING, spend FLOAT64)
         Table: `{project}.datapilot_analytics.fact_campaign_attribution` (campaign_id STRING, order_id STRING, revenue_credit FLOAT64)
@@ -180,12 +207,15 @@ class QueryOrchestrator:
         started_at: float,
         metric: dict | None,
         assumptions: list[str],
+        plan: dict[str, Any] | None = None,
+        agent_trace: list[dict[str, Any]] | None = None,
         sql: str = "",
         bytes_processed: int = 0,
         estimated_cost_usd: float = 0.0,
         fallback_used: bool = False,
         fallback_type: str | None = None,
     ) -> dict[str, Any]:
+        plan = plan or {}
         return {
             "status": "error",
             "query_id": query_id,
@@ -196,6 +226,10 @@ class QueryOrchestrator:
             "metric_used": metric.get("metric_name") if metric else None,
             "assumptions": assumptions,
             "freshness": {"status": "not_checked", "message": "Freshness observability starts in Phase 7."},
+            "plan": plan,
+            "agents": agent_coordinator.error_trace(agent_trace or [], message),
+            "complexity": plan.get("complexity"),
+            "recommended_visualization": plan.get("visualization"),
             "fallback_used": fallback_used,
             "fallback_type": fallback_type,
             "execution_time_ms": self._elapsed_ms(started_at),
