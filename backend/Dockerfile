@@ -1,11 +1,13 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV SEMANTIC_CONFIG_DIR=/app/semantic
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+COPY backend/app ./app
+COPY semantic ./semantic
 
 EXPOSE 8080
 

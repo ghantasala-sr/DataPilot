@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 
 type CellValue = string | number | boolean | null;
 type QueryRow = Record<string, CellValue>;
@@ -34,14 +34,17 @@ type QueryResult = {
   intent?: string;
 };
 
-type HistoryItem = {
+type ChatMessage = {
   id: string;
-  question: string;
-  status: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  status?: string;
   createdAt: string;
+  result?: QueryResult;
 };
 
 type FeedbackState = 'helpful' | 'needs-work' | null;
+type VizMode = 'chart' | 'map' | 'table';
 
 const sampleQuestions = [
   'What was monthly revenue by product category?',
@@ -50,10 +53,10 @@ const sampleQuestions = [
 ];
 
 const demoRows: QueryRow[] = [
-  { segment: 'Electronics', revenue: 184200, orders: 831, refund_rate: 0.034 },
-  { segment: 'Home', revenue: 137650, orders: 690, refund_rate: 0.027 },
-  { segment: 'Beauty', revenue: 94220, orders: 544, refund_rate: 0.019 },
-  { segment: 'Sports', revenue: 81710, orders: 402, refund_rate: 0.041 },
+  { customer_state: 'SP', gross_revenue: 184200, total_orders: 831, delay_rate: 0.034 },
+  { customer_state: 'RJ', gross_revenue: 137650, total_orders: 690, delay_rate: 0.027 },
+  { customer_state: 'MG', gross_revenue: 94220, total_orders: 544, delay_rate: 0.019 },
+  { customer_state: 'PR', gross_revenue: 81710, total_orders: 402, delay_rate: 0.041 },
 ];
 
 function toCellValue(value: unknown): CellValue {
@@ -141,47 +144,103 @@ function formatBytes(bytes?: number) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function createHistoryItem(question: string, result: QueryResult): HistoryItem {
-  return {
-    id: result.query_id ?? `${Date.now()}`,
-    question,
-    status: result.status ?? 'success',
-    createdAt: new Intl.DateTimeFormat('en', {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(new Date()),
-  };
+function formatClock() {
+  return new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date());
+}
+
+function answerText(result: QueryResult | null) {
+  return result?.explanation || result?.answer || result?.message || '';
+}
+
+function inferLabelColumn(rows: QueryRow[]) {
+  const first = rows[0] ?? {};
+  return Object.keys(first).find((key) => typeof first[key] === 'string');
+}
+
+function inferNumberColumn(rows: QueryRow[]) {
+  const first = rows[0] ?? {};
+  const priority = ['gross_revenue', 'total_revenue', 'monthly_revenue', 'revenue', 'roi', 'delay_rate', 'total_orders', 'orders'];
+  const numericKeys = Object.keys(first).filter((key) => typeof first[key] === 'number');
+  return priority.find((key) => numericKeys.includes(key)) || numericKeys[0];
+}
+
+function stripMarkdown(value: string) {
+  return value.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+}
+
+function renderInlineMarkdown(value: string) {
+  const parts = value.split(/(\*\*[^*]+\*\*)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={`${part}-${index}`} className="font-semibold text-[var(--ink)]">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
+function summarizeForChat(result: QueryResult) {
+  if (result.status === 'error') {
+    return result.message || result.answer || 'The query could not be completed.';
+  }
+
+  const rows = typeof result.rows_returned === 'number' ? `${result.rows_returned} rows` : 'results';
+  const cost = typeof result.estimated_cost_usd === 'number' ? `$${result.estimated_cost_usd.toFixed(6)}` : '$0.000000';
+  return `Completed. ${rows} returned, estimated query cost ${cost}.`;
 }
 
 export default function Home() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [vizMode, setVizMode] = useState<VizMode>('chart');
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (typeof window === 'undefined') return [];
 
     try {
-      const saved = window.localStorage.getItem('datapilot-query-history');
-      return saved ? (JSON.parse(saved) as HistoryItem[]) : [];
+      const saved = window.localStorage.getItem('datapilot-chat-history');
+      return saved ? (JSON.parse(saved) as ChatMessage[]) : [];
     } catch {
       return [];
     }
   });
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem('datapilot-query-history', JSON.stringify(history.slice(0, 8)));
-  }, [history]);
+    window.localStorage.setItem('datapilot-chat-history', JSON.stringify(messages.slice(-16)));
+  }, [messages]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, loading]);
 
   const rows = result ? result.rows ?? [] : demoRows;
   const sql = result?.sql_generated || result?.sql || '';
-  const answer = result?.explanation || result?.answer || result?.message;
-  const apiBase = 'same-origin /api/query';
+  const answer = answerText(result);
 
-  const handleQuery = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!query.trim()) return;
+  const handleQuery = async (event?: FormEvent<HTMLFormElement>, nextQuery?: string) => {
+    event?.preventDefault();
+    const question = (nextQuery ?? query).trim();
+    if (!question) return;
 
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: question,
+      createdAt: formatClock(),
+    };
+
+    setMessages((items) => [...items, userMessage]);
+    setQuery('');
     setLoading(true);
     setFeedback(null);
 
@@ -193,8 +252,8 @@ export default function Home() {
           Authorization: 'Bearer test-mock-token',
         },
         body: JSON.stringify({
-          question: query,
-          query,
+          question,
+          query: question,
           user_id: 'demo_user',
           user_role: 'sales_manager',
           tenant_id: 'demo_company',
@@ -211,7 +270,17 @@ export default function Home() {
       }
 
       setResult(nextResult);
-      setHistory((items) => [createHistoryItem(query, nextResult), ...items].slice(0, 8));
+      setMessages((items) => [
+        ...items,
+        {
+          id: nextResult.query_id ?? `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: summarizeForChat(nextResult),
+          status: nextResult.status,
+          createdAt: formatClock(),
+          result: nextResult,
+        },
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to connect to backend.';
       const nextResult: QueryResult = {
@@ -222,7 +291,17 @@ export default function Home() {
       };
 
       setResult(nextResult);
-      setHistory((items) => [createHistoryItem(query, nextResult), ...items].slice(0, 8));
+      setMessages((items) => [
+        ...items,
+        {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: message,
+          status: 'error',
+          createdAt: formatClock(),
+          result: nextResult,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -230,7 +309,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-4 py-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 py-4 sm:px-5 xl:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-4">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--ink)] text-sm font-semibold text-white">
@@ -247,89 +326,28 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="grid flex-1 gap-5 py-5 lg:grid-cols-[270px_minmax(0,1fr)]">
-          <aside className="border-r border-[var(--line)] pr-0 lg:pr-5">
-            <div className="mb-4">
-              <p className="mb-2 text-xs font-semibold text-[var(--muted)]">Recent queries</p>
-              <div className="space-y-2">
-                {history.length ? (
-                  history.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setQuery(item.question)}
-                      className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--mist)]"
-                    >
-                      <span className="line-clamp-2 text-sm text-[var(--ink)]">{item.question}</span>
-                      <span className="mt-2 flex items-center justify-between text-xs text-[var(--muted)]">
-                        <span>{item.createdAt}</span>
-                        <span className={item.status === 'error' ? 'text-[var(--danger)]' : 'text-[var(--accent-dark)]'}>
-                          {item.status}
-                        </span>
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="rounded-lg border border-dashed border-[var(--line)] px-3 py-5 text-sm text-[var(--muted)]">
-                    Query history appears after the first run.
-                  </p>
-                )}
-              </div>
-            </div>
-          </aside>
+        <div className="grid flex-1 gap-5 py-5 xl:grid-cols-[340px_minmax(0,1fr)_340px]">
+          <ChatWindow
+            messages={messages}
+            loading={loading}
+            query={query}
+            setQuery={setQuery}
+            onSubmit={handleQuery}
+            onPrompt={(question) => void handleQuery(undefined, question)}
+            endRef={chatEndRef}
+          />
 
-          <section className="min-w-0">
-            <form onSubmit={handleQuery} className="mb-5 rounded-lg border border-[var(--line)] bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-              <label htmlFor="query" className="mb-2 block text-sm font-medium text-[var(--ink)]">
-                Ask your data
-              </label>
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_120px]">
-                <input
-                  id="query"
-                  type="text"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="What was our revenue last month?"
-                  className="h-12 min-w-0 rounded-md border border-[var(--line)] bg-[var(--mist)] px-4 text-base outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]"
-                  disabled={loading}
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !query.trim()}
-                  className="h-12 rounded-md bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--accent-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loading ? 'Analyzing' : 'Analyze'}
-                </button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {sampleQuestions.map((question) => (
-                  <button
-                    key={question}
-                    type="button"
-                    onClick={() => setQuery(question)}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--ink)]"
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            </form>
-
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-              <div className="space-y-5">
-                <ResultOverview result={result} answer={answer} loading={loading} />
-                <ResultTable rows={rows} />
-                <ResultChart rows={rows} />
-              </div>
-
-              <div className="space-y-5">
-                <RunStatus result={result} apiBase={apiBase} />
-                <SemanticPanel result={result} />
-                <SqlPanel sql={sql} />
-                <FeedbackButtons feedback={feedback} setFeedback={setFeedback} disabled={!result} />
-              </div>
-            </div>
+          <section className="min-w-0 space-y-5">
+            <AnswerPanel result={result} answer={answer} loading={loading} />
+            <VisualizationAgent rows={rows} mode={vizMode} setMode={setVizMode} result={result} />
           </section>
+
+          <aside className="min-w-0 space-y-5">
+            <RunStatus result={result} />
+            <SemanticPanel result={result} />
+            <SqlPanel sql={sql} />
+            <FeedbackButtons feedback={feedback} setFeedback={setFeedback} disabled={!result} />
+          </aside>
         </div>
       </div>
     </main>
@@ -347,114 +365,378 @@ function StatusBadge({ label, tone }: { label: string; tone: 'ok' | 'warn' | 'da
   return <span className={`rounded-full border px-2.5 py-1 ${toneClass}`}>{label}</span>;
 }
 
-function ResultOverview({
+function ChatWindow({
+  messages,
+  loading,
+  query,
+  setQuery,
+  onSubmit,
+  onPrompt,
+  endRef,
+}: {
+  messages: ChatMessage[];
+  loading: boolean;
+  query: string;
+  setQuery: (query: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onPrompt: (question: string) => void;
+  endRef: RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <aside className="flex min-h-[720px] flex-col rounded-lg border border-[var(--line)] bg-white">
+      <div className="border-b border-[var(--line)] px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Chat window</p>
+        <h2 className="mt-1 text-lg font-semibold text-[var(--ink)]">Ask, refine, compare</h2>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        {messages.length ? (
+          messages.map((message) => <ChatBubble key={message.id} message={message} />)
+        ) : (
+          <div className="rounded-lg border border-dashed border-[var(--line)] bg-[var(--mist)] px-4 py-5 text-sm text-[var(--muted)]">
+            Start with a business question. Follow-ups stay here so the workspace reads like an analysis session.
+          </div>
+        )}
+        {loading && (
+          <div className="rounded-lg border border-[var(--line)] bg-[var(--mist)] px-4 py-3 text-sm text-[var(--body)]">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent-dark)]" />
+              Resolving semantics, SQL, cost, and visualization.
+            </span>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      <div className="border-t border-[var(--line)] p-4">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {sampleQuestions.map((question) => (
+            <button
+              key={question}
+              type="button"
+              disabled={loading}
+              onClick={() => onPrompt(question)}
+              className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {question}
+            </button>
+          ))}
+        </div>
+        <form onSubmit={onSubmit} className="grid gap-2">
+          <textarea
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Ask a governed analytics question..."
+            className="min-h-24 resize-none rounded-md border border-[var(--line)] bg-[var(--mist)] px-3 py-3 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]"
+            disabled={loading}
+          />
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="h-11 rounded-md bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--accent-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? 'Analyzing' : 'Send to DataPilot'}
+          </button>
+        </form>
+      </div>
+    </aside>
+  );
+}
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user';
+  const isError = message.status === 'error';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[88%] rounded-lg px-3 py-3 text-sm ${
+          isUser
+            ? 'bg-[var(--ink)] text-white'
+            : isError
+              ? 'border border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger)]'
+              : 'border border-[var(--line)] bg-white text-[var(--body)]'
+        }`}
+      >
+        <p className="leading-6">{message.content}</p>
+        <p className={`mt-2 text-[11px] ${isUser ? 'text-white/55' : 'text-[var(--muted)]'}`}>{message.createdAt}</p>
+      </div>
+    </div>
+  );
+}
+
+function AnswerPanel({
   result,
   answer,
   loading,
 }: {
   result: QueryResult | null;
-  answer?: string;
+  answer: string;
   loading: boolean;
 }) {
   return (
     <section className="rounded-lg border border-[var(--line)] bg-white p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-[var(--muted)]">Analysis result</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-[0] text-[var(--ink)]">
-            {loading ? 'Resolving governed context' : result ? 'Answer' : 'Ready for a governed query'}
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">AI answer</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-[0] text-[var(--ink)]">
+            {loading ? 'Working through the governed query' : result ? 'Formatted response' : 'Ready for analysis'}
           </h2>
         </div>
         {result && <StatusBadge tone={result.status === 'error' ? 'danger' : 'ok'} label={result.status ?? 'success'} />}
       </div>
-      <p className="min-h-20 text-base leading-7 text-[var(--body)]">
-        {loading
-          ? 'Checking semantic definitions, approved joins, policy scope, and execution safety.'
-          : answer || 'Run a question to see the answer, generated SQL, semantic assumptions, and result previews.'}
-      </p>
+      {loading ? (
+        <p className="min-h-28 text-base leading-7 text-[var(--body)]">
+          Checking semantic definitions, approved joins, policy scope, cost estimate, warehouse execution, and visualization fit.
+        </p>
+      ) : answer ? (
+        <FormattedAnswer text={answer} />
+      ) : (
+        <p className="min-h-28 text-base leading-7 text-[var(--body)]">
+          Ask a question in the chat window to see a formatted answer, chart/map options, generated SQL, and execution status.
+        </p>
+      )}
     </section>
   );
 }
 
-function ResultTable({ rows }: { rows: QueryRow[] }) {
-  const columns = useMemo(() => Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).slice(0, 8), [rows]);
+function FormattedAnswer({ text }: { text: string }) {
+  const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-4 text-[15px] leading-7 text-[var(--body)]">
+      {blocks.map((block, index) => {
+        const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+        const isList = lines.every((line) => line.startsWith('*') || line.startsWith('-'));
+
+        if (isList) {
+          return (
+            <ul key={`${block}-${index}`} className="space-y-2">
+              {lines.map((line) => (
+                <li key={line} className="border-l-2 border-[var(--accent)] pl-3">
+                  {renderInlineMarkdown(stripMarkdown(line.replace(/^[-*]\s*/, '')))}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.endsWith(':') && block.length < 80) {
+          return (
+            <h3 key={`${block}-${index}`} className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--accent-dark)]">
+              {stripMarkdown(block)}
+            </h3>
+          );
+        }
+
+        return <p key={`${block}-${index}`}>{renderInlineMarkdown(block)}</p>;
+      })}
+    </div>
+  );
+}
+
+function VisualizationAgent({
+  rows,
+  mode,
+  setMode,
+  result,
+}: {
+  rows: QueryRow[];
+  mode: VizMode;
+  setMode: (mode: VizMode) => void;
+  result: QueryResult | null;
+}) {
+  const labelColumn = inferLabelColumn(rows);
+  const valueColumn = inferNumberColumn(rows);
+  const hasRows = rows.length > 0;
 
   return (
     <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
-      <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Results table</h2>
-        <span className="text-xs text-[var(--muted)]">{rows.length} rows</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Visualization agent</p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--ink)]">
+            {valueColumn ? `${valueColumn.replaceAll('_', ' ')} by ${labelColumn?.replaceAll('_', ' ') || 'row'}` : 'Awaiting numeric output'}
+          </h2>
+        </div>
+        <div className="grid grid-cols-3 rounded-md border border-[var(--line)] bg-[var(--mist)] p-1 text-xs">
+          {(['chart', 'map', 'table'] as VizMode[]).map((nextMode) => (
+            <button
+              key={nextMode}
+              type="button"
+              onClick={() => setMode(nextMode)}
+              className={`rounded px-3 py-1.5 capitalize transition ${
+                mode === nextMode ? 'bg-white text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'
+              }`}
+            >
+              {nextMode}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-left text-sm">
-          <thead className="bg-[var(--mist)] text-xs text-[var(--muted)]">
-            <tr>
-              {columns.map((column) => (
-                <th key={column} className="border-b border-[var(--line)] px-4 py-3 font-semibold">
-                  {column.replaceAll('_', ' ')}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${index}-${columns.join('-')}`} className="border-b border-[var(--line)] last:border-0">
-                {columns.map((column) => (
-                  <td key={column} className="px-4 py-3 text-[var(--body)]">
-                    {formatCell(row[column] ?? null)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      {!hasRows ? (
+        <div className="px-5 py-12 text-sm text-[var(--muted)]">Successful query rows will render here.</div>
+      ) : mode === 'map' ? (
+        <MapView rows={rows} />
+      ) : mode === 'table' ? (
+        <ResultTable rows={rows} compact />
+      ) : (
+        <ChartView rows={rows} />
+      )}
+
+      <div className="border-t border-[var(--line)] px-5 py-3 text-xs text-[var(--muted)]">
+        {result?.status === 'error'
+          ? 'Visualization paused until the query succeeds.'
+          : 'Agent chooses dimensions from returned fields; switch modes to inspect shape and geography.'}
       </div>
     </section>
   );
 }
 
-function ResultChart({ rows }: { rows: QueryRow[] }) {
-  const numericColumns = useMemo(() => {
-    const first = rows[0] ?? {};
-    return Object.keys(first).filter((key) => typeof first[key] === 'number');
-  }, [rows]);
-  const labelColumn = useMemo(() => Object.keys(rows[0] ?? {}).find((key) => typeof rows[0]?.[key] === 'string'), [rows]);
-  const valueColumn = numericColumns[0];
+function ChartView({ rows }: { rows: QueryRow[] }) {
+  const labelColumn = inferLabelColumn(rows);
+  const valueColumn = inferNumberColumn(rows);
   const maxValue = Math.max(...rows.map((row) => (typeof row[valueColumn] === 'number' ? row[valueColumn] : 0)), 1);
 
+  if (!valueColumn) {
+    return <div className="px-5 py-12 text-sm text-[var(--muted)]">No numeric field found for a chart.</div>;
+  }
+
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Chart view</h2>
-        <span className="text-xs text-[var(--muted)]">{valueColumn ? valueColumn.replaceAll('_', ' ') : 'No numeric field'}</span>
-      </div>
-      <div className="space-y-3">
-        {valueColumn ? (
-          rows.slice(0, 6).map((row, index) => {
-            const value = typeof row[valueColumn] === 'number' ? row[valueColumn] : 0;
-            const label = labelColumn ? String(row[labelColumn]) : `Row ${index + 1}`;
-            return (
-              <div key={`${label}-${index}`} className="grid grid-cols-[110px_minmax(0,1fr)_80px] items-center gap-3 text-sm">
-                <span className="truncate text-[var(--body)]">{label}</span>
-                <span className="h-3 overflow-hidden rounded-full bg-[var(--mist)]">
-                  <span
-                    className="block h-full rounded-full bg-[var(--accent)] transition-all duration-500"
-                    style={{ width: `${Math.max((value / maxValue) * 100, 4)}%` }}
-                  />
-                </span>
-                <span className="text-right tabular-nums text-[var(--muted)]">{formatCell(value)}</span>
-              </div>
-            );
-          })
-        ) : (
-          <p className="text-sm text-[var(--muted)]">Numeric results will render as bars after execution.</p>
-        )}
-      </div>
-    </section>
+    <div className="space-y-3 p-5">
+      {rows.slice(0, 12).map((row, index) => {
+        const value = typeof row[valueColumn] === 'number' ? row[valueColumn] : 0;
+        const label = labelColumn ? String(row[labelColumn]) : `Row ${index + 1}`;
+        return (
+          <div key={`${label}-${index}`} className="grid grid-cols-[minmax(90px,150px)_minmax(0,1fr)_96px] items-center gap-3 text-sm">
+            <span className="truncate text-[var(--body)]">{label}</span>
+            <span className="h-3 overflow-hidden rounded-full bg-[var(--mist)]">
+              <span
+                className="block h-full rounded-full bg-[var(--accent)] transition-all duration-500"
+                style={{ width: `${Math.max((value / maxValue) * 100, 4)}%` }}
+              />
+            </span>
+            <span className="text-right tabular-nums text-[var(--muted)]">{formatCell(value)}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function RunStatus({ result, apiBase }: { result: QueryResult | null; apiBase: string }) {
+function MapView({ rows }: { rows: QueryRow[] }) {
+  const stateColumn = useMemo(() => {
+    const first = rows[0] ?? {};
+    return Object.keys(first).find((key) => key.toLowerCase().includes('state')) || inferLabelColumn(rows);
+  }, [rows]);
+  const valueColumn = inferNumberColumn(rows);
+  const points = useMemo(() => aggregateMapPoints(rows, stateColumn, valueColumn), [rows, stateColumn, valueColumn]);
+  const maxValue = Math.max(...points.map((point) => point.value), 1);
+
+  return (
+    <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_230px]">
+      <div className="relative min-h-[360px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--map-bg)]">
+        <svg viewBox="0 0 520 360" className="h-full min-h-[360px] w-full">
+          <path
+            d="M244 42 318 58 389 112 432 187 409 272 333 321 243 334 157 298 92 223 80 147 134 82Z"
+            fill="#e7efe9"
+            stroke="#cbd9d1"
+            strokeWidth="2"
+          />
+          <path d="M135 82 244 42 318 58 276 142 179 145Z" fill="#edf4ef" stroke="#d7e2dc" />
+          <path d="M179 145 276 142 324 214 246 250 164 220Z" fill="#f6faf7" stroke="#d7e2dc" />
+          <path d="M276 142 389 112 432 187 324 214Z" fill="#eef6f1" stroke="#d7e2dc" />
+          <path d="M164 220 246 250 243 334 157 298 92 223Z" fill="#eef6f1" stroke="#d7e2dc" />
+          <path d="M246 250 324 214 409 272 333 321 243 334Z" fill="#f8fbf9" stroke="#d7e2dc" />
+          {points.map((point) => {
+            const radius = 12 + (point.value / maxValue) * 30;
+            return (
+              <g key={point.state}>
+                <circle cx={point.x} cy={point.y} r={radius} fill="#57d5b0" opacity="0.26" />
+                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.42, 7)} fill="#087c68" opacity="0.82" />
+                <text x={point.x} y={point.y - radius - 8} textAnchor="middle" className="fill-[var(--ink)] text-[13px] font-semibold">
+                  {point.state}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Map layer</p>
+          <h3 className="mt-1 text-base font-semibold text-[var(--ink)]">{valueColumn?.replaceAll('_', ' ') || 'value'} by state</h3>
+        </div>
+        {points.map((point) => (
+          <div key={point.state} className="flex items-center justify-between gap-3 border-b border-[var(--line)] pb-2 text-sm last:border-0">
+            <span className="font-medium text-[var(--body)]">{point.state}</span>
+            <span className="tabular-nums text-[var(--muted)]">{formatCell(point.value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function aggregateMapPoints(rows: QueryRow[], stateColumn?: string, valueColumn?: string) {
+  const positions: Record<string, { x: number; y: number }> = {
+    SP: { x: 292, y: 260 },
+    RJ: { x: 332, y: 244 },
+    MG: { x: 286, y: 214 },
+    PR: { x: 259, y: 292 },
+  };
+  const totals = new Map<string, number>();
+
+  rows.forEach((row) => {
+    const rawState = stateColumn ? row[stateColumn] : null;
+    const state = typeof rawState === 'string' ? rawState.toUpperCase().slice(0, 2) : 'SP';
+    const rawValue = valueColumn ? row[valueColumn] : null;
+    const value = typeof rawValue === 'number' ? rawValue : 1;
+    totals.set(state, (totals.get(state) || 0) + value);
+  });
+
+  const entries = Array.from(totals.entries()).slice(0, 8);
+  return entries.map(([state, value], index) => ({
+    state,
+    value,
+    x: positions[state]?.x ?? 145 + index * 42,
+    y: positions[state]?.y ?? 110 + (index % 3) * 55,
+  }));
+}
+
+function ResultTable({ rows, compact = false }: { rows: QueryRow[]; compact?: boolean }) {
+  const columns = useMemo(() => Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).slice(0, 8), [rows]);
+
+  return (
+    <div className={compact ? 'max-h-[420px] overflow-auto' : 'overflow-x-auto'}>
+      <table className="min-w-full border-collapse text-left text-sm">
+        <thead className="sticky top-0 bg-[var(--mist)] text-xs text-[var(--muted)]">
+          <tr>
+            {columns.map((column) => (
+              <th key={column} className="border-b border-[var(--line)] px-4 py-3 font-semibold">
+                {column.replaceAll('_', ' ')}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${index}-${columns.join('-')}`} className="border-b border-[var(--line)] last:border-0">
+              {columns.map((column) => (
+                <td key={column} className="px-4 py-3 text-[var(--body)]">
+                  {formatCell(row[column] ?? null)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RunStatus({ result }: { result: QueryResult | null }) {
   const fallbackLabel = result?.fallback_used ? result.fallback_type || 'Fallback used' : 'No fallback';
   const freshnessLabel = result?.freshness?.status || result?.freshness?.message || 'Freshness pending';
 
@@ -462,9 +744,10 @@ function RunStatus({ result, apiBase }: { result: QueryResult | null; apiBase: s
     <section className="rounded-lg border border-[var(--line)] bg-white p-5">
       <h2 className="mb-4 text-sm font-semibold text-[var(--ink)]">Run status</h2>
       <div className="grid gap-3 text-sm">
-        <StatusRow label="API" value={apiBase} />
+        <StatusRow label="API" value="same-origin /api/query" />
         <StatusRow label="Freshness" value={freshnessLabel} />
         <StatusRow label="Fallback" value={fallbackLabel} tone={result?.fallback_used ? 'warn' : 'ok'} />
+        <StatusRow label="Rows" value={`${result?.rows_returned ?? 0}`} />
         <StatusRow label="Bytes" value={formatBytes(result?.bytes_processed)} />
         <StatusRow label="Cost" value={`$${(result?.estimated_cost_usd ?? 0).toFixed(6)}`} />
       </div>

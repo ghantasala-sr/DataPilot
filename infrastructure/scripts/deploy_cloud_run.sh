@@ -31,8 +31,9 @@ gcloud artifacts repositories create "${ARTIFACT_REPO}" \
 # ─── Build and deploy backend ─────────────────────────────────
 echo ""
 echo "2. Building backend image..."
-gcloud builds submit backend/ \
-  --tag "${IMAGE_PREFIX}/datapilot-backend:${TAG}" \
+gcloud builds submit . \
+  --config infrastructure/cloudbuild_backend.yaml \
+  --substitutions "_IMAGE=${IMAGE_PREFIX}/datapilot-backend:${TAG}" \
   --quiet
 
 echo ""

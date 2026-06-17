@@ -8,7 +8,10 @@ class SemanticResolver:
     Resolves business concepts, metrics, and policies from YAML configs and BigQuery.
     """
     def __init__(self, config_dir: str = "../../../semantic"):
-        self.config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), config_dir))
+        self.config_dir = os.environ.get(
+            "SEMANTIC_CONFIG_DIR",
+            os.path.abspath(os.path.join(os.path.dirname(__file__), config_dir)),
+        )
         self.project_id = os.environ.get('PROJECT_ID', '')
         self.dataset_id = f"{self.project_id}.datapilot_semantic" if self.project_id else "datapilot_semantic"
         

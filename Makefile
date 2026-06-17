@@ -74,7 +74,7 @@ dbt-docs: ## Generate and serve dbt docs
 # ─── Docker ──────────────────────────────────────────────────
 
 docker-build-backend: ## Build backend Docker image
-	docker build -t datapilot-backend:latest backend/
+	docker build -f backend/Dockerfile -t datapilot-backend:latest .
 
 docker-build-frontend: ## Build frontend Docker image
 	docker build -t datapilot-frontend:latest frontend/

@@ -88,6 +88,9 @@ templates:
       - "delivery delays"
       - "late deliveries"
       - "delayed deliveries by state"
+      - "delivery delay rate"
+      - "delivery delay rate by customer state"
+      - "delay rate by customer state"
     sql_template: |
       SELECT
         c.customer_state,
