@@ -159,7 +159,7 @@ class QueryOrchestrator:
     def _schema_context(self, project: str) -> str:
         return f"""
         Table: `{project}.datapilot_analytics.dim_customers` (customer_id STRING, customer_state STRING)
-        Table: `{project}.datapilot_analytics.dim_products` (product_id STRING, product_category_name STRING)
+        Table: `{project}.datapilot_analytics.dim_products` (product_id STRING, product_category_name STRING, product_category_name_english STRING)
         Table: `{project}.datapilot_analytics.fact_orders` (order_id STRING, customer_id STRING, order_status STRING, order_purchase_timestamp TIMESTAMP)
         Table: `{project}.datapilot_analytics.fact_order_items` (order_id STRING, product_id STRING, seller_id STRING, price FLOAT64, freight_value FLOAT64)
         Table: `{project}.datapilot_analytics.dim_campaigns` (campaign_id STRING, campaign_name STRING, channel STRING, spend FLOAT64)

@@ -13,7 +13,7 @@ templates:
     sql_template: |
       SELECT
         FORMAT_DATE('%Y-%m', DATE(o.order_purchase_timestamp)) AS month,
-        p.product_category_name,
+        COALESCE(p.product_category_name_english, p.product_category_name) AS product_category_name,
         COUNT(DISTINCT o.order_id) AS total_orders,
         SUM(oi.price) AS gross_revenue
       FROM `{project}.datapilot_analytics.fact_orders` o
@@ -121,7 +121,7 @@ templates:
       - "top 10 products by revenue"
     sql_template: |
       SELECT
-        p.product_category_name,
+        COALESCE(p.product_category_name_english, p.product_category_name) AS product_category_name,
         p.product_id,
         COUNT(DISTINCT oi.order_id) AS order_count,
         SUM(oi.price) AS gross_revenue

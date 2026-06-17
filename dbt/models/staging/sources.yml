@@ -20,6 +20,8 @@ sources:
         description: "Raw customer records with location."
       - name: raw_products
         description: "Raw product catalog."
+      - name: raw_product_category_translation
+        description: "Original Olist product category Portuguese-to-English labels."
       - name: raw_sellers
         description: "Raw seller records."
       - name: raw_reviews
