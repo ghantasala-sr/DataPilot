@@ -448,7 +448,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 py-4 sm:px-5 xl:px-6">
-        <header className="sticky top-3 z-30 rounded-xl border border-black/10 bg-[var(--nav)] px-4 py-3 text-white shadow-lg shadow-black/10">
+        <header className="audit-ribbon sticky top-3 z-30 overflow-hidden rounded-xl border border-black/10 bg-[var(--nav)] px-4 py-3 pl-6 text-white shadow-lg shadow-black/10">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-[220px] items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--accent)] text-sm font-semibold text-[var(--ink)] shadow-sm">
@@ -539,7 +539,7 @@ function ChatWindow({
   endRef: RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <aside className="flex min-h-[720px] flex-col overflow-hidden rounded-xl bg-[var(--nav)] text-white shadow-lg shadow-black/10">
+    <aside className="audit-ribbon flex min-h-[720px] flex-col overflow-hidden rounded-xl bg-[var(--nav)] pl-[5px] text-white shadow-lg shadow-black/10">
       <div className="border-b border-white/10 px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Chat window</p>
         <h2 className="mt-1 text-lg font-semibold text-white">Ask, refine, compare</h2>
@@ -631,7 +631,7 @@ function AnswerPanel({
   loading: boolean;
 }) {
   return (
-    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 pl-6 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">AI answer</p>
@@ -772,7 +772,7 @@ function VisualizationAgent({
   const recommendation = result?.recommended_visualization ?? result?.plan?.visualization;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] pl-[5px] shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Visualization agent</p>
@@ -889,9 +889,9 @@ function MapView({ rows }: { rows: QueryRow[] }) {
             const isNegative = point.value < 0;
             return (
               <g key={point.state}>
-                <circle cx={point.x} cy={point.y} r={radius + 5} fill={isNegative ? '#b94b4b' : '#ff7358'} opacity="0.18" />
-                <circle cx={point.x} cy={point.y} r={radius} fill={isNegative ? '#b94b4b' : '#b63b27'} opacity={0.42 + normalized * 0.42} />
-                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.36, 4)} fill="#fff7f4" opacity="0.92" />
+                <circle cx={point.x} cy={point.y} r={radius + 5} fill={isNegative ? '#b94b4b' : '#c8792a'} opacity="0.18" />
+                <circle cx={point.x} cy={point.y} r={radius} fill={isNegative ? '#b94b4b' : '#7a3e14'} opacity={0.42 + normalized * 0.42} />
+                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.36, 4)} fill="#fffdf8" opacity="0.92" />
                 {labelVisible && (
                   <text x={point.x} y={point.y - radius - 8} textAnchor="middle" className="fill-[var(--ink)] text-[12px] font-semibold">
                     {point.state}
@@ -1022,7 +1022,7 @@ function RunStatus({ result }: { result: QueryResult | null }) {
   const freshnessLabel = result?.freshness?.status || result?.freshness?.message || 'Freshness pending';
 
   return (
-    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 pl-6 shadow-sm">
       <h2 className="mb-4 text-sm font-semibold text-[var(--ink)]">Run status</h2>
       <div className="grid gap-3 text-sm">
         <StatusRow label="API" value="same-origin /api/query" />
@@ -1045,7 +1045,7 @@ function PlanningPanel({ result, loading }: { result: QueryResult | null; loadin
   const visibleAgents = agents.slice(0, 6);
 
   return (
-    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 pl-6 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-[var(--ink)]">Planning agents</h2>
@@ -1139,7 +1139,7 @@ function SemanticPanel({ result }: { result: QueryResult | null }) {
     : ['Metric definitions are resolved server-side.', 'Approved join paths are required before SQL execution.'];
 
   return (
-    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 pl-6 shadow-sm">
       <h2 className="mb-4 text-sm font-semibold text-[var(--ink)]">Semantic context</h2>
       <div className="mb-4 rounded-md bg-[var(--mist)] p-3">
         <p className="text-xs text-[var(--muted)]">Metric definition</p>
@@ -1158,7 +1158,7 @@ function SemanticPanel({ result }: { result: QueryResult | null }) {
 
 function SqlPanel({ sql }: { sql: string }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-black/10 bg-[var(--nav)] text-white shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-black/10 bg-[var(--nav)] pl-[5px] text-white shadow-sm">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
         <h2 className="text-sm font-semibold">Generated SQL</h2>
         <span className="text-xs text-white/55">BigQuery</span>
@@ -1180,7 +1180,7 @@ function FeedbackButtons({
   disabled: boolean;
 }) {
   return (
-    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+    <section className="audit-ribbon overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 pl-6 shadow-sm">
       <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">Feedback</h2>
       <div className="grid grid-cols-2 gap-2">
         <button
