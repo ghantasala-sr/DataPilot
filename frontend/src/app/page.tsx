@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, ReactNode, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 
 type CellValue = string | number | boolean | null;
 type QueryRow = Record<string, CellValue>;
@@ -280,11 +280,18 @@ function inferNumberColumn(rows: QueryRow[]) {
 }
 
 function stripMarkdown(value: string) {
-  return value.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+  return value
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^[-*]\s*/, '')
+    .replace(/^\d+\.\s*/, '')
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/`/g, '')
+    .trim();
 }
 
 function renderInlineMarkdown(value: string) {
-  const parts = value.split(/(\*\*[^*]+\*\*)/g);
+  const parts = value.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
 
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -295,8 +302,25 @@ function renderInlineMarkdown(value: string) {
       );
     }
 
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <code key={`${part}-${index}`} className="rounded bg-[var(--mist)] px-1.5 py-0.5 font-mono text-[13px] text-[var(--ink)]">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
     return <span key={`${part}-${index}`}>{part}</span>;
   });
+}
+
+function normalizeAnswerLines(text: string) {
+  return text
+    .replace(/\s+(\d+\.\s+\*\*)/g, '\n$1')
+    .replace(/\n\s*[-]{2,}\s*\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !/^[-]{2,}$/.test(line));
 }
 
 function summarizeForChat(result: QueryResult) {
@@ -424,19 +448,36 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 py-4 sm:px-5 xl:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--ink)] text-sm font-semibold text-white">
-              DP
+        <header className="sticky top-3 z-30 rounded-xl border border-[var(--line)] bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-[220px] items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--ink)] text-sm font-semibold text-white shadow-sm">
+                DP
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold tracking-[0] text-[var(--ink)]">DataPilot</h1>
+                <p className="text-xs text-[var(--muted)]">Governed analytics workspace</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-[0] text-[var(--ink)]">DataPilot</h1>
-              <p className="text-sm text-[var(--muted)]">Governed analytics workspace</p>
+
+            <nav aria-label="Workspace navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto rounded-lg bg-[var(--mist)] p-1 text-sm md:order-2 md:w-auto">
+              {['Ask', 'Visualize', 'Semantic plan', 'SQL'].map((item, index) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`whitespace-nowrap rounded-md px-3 py-2 transition ${
+                    index === 0 ? 'bg-white text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:bg-white/70 hover:text-[var(--ink)]'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </nav>
+
+            <div className="order-2 flex items-center gap-2 text-xs text-[var(--muted)] md:order-3">
+              <StatusBadge tone="neutral" label="Sales manager" />
+              <StatusBadge tone="ok" label="Admin scope" />
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
-            <StatusBadge tone="neutral" label="Sales manager" />
-            <StatusBadge tone="ok" label="Admin scope" />
           </div>
         </header>
 
@@ -616,36 +657,100 @@ function AnswerPanel({
 }
 
 function FormattedAnswer({ text }: { text: string }) {
-  const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  const lines = normalizeAnswerLines(text);
+  const elements: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+
+    if (/^#{1,6}\s+/.test(line)) {
+      const level = line.match(/^#{1,6}/)?.[0].length ?? 3;
+      elements.push(
+        <h3
+          key={`${line}-${index}`}
+          className={level <= 2 ? 'text-lg font-semibold text-[var(--ink)]' : 'text-sm font-semibold text-[var(--ink)]'}
+        >
+          {renderInlineMarkdown(stripMarkdown(line))}
+        </h3>,
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^[-*]\s+/, ''));
+        index += 1;
+      }
+      elements.push(
+        <ul key={`${line}-${index}`} className="space-y-2">
+          {items.map((item) => (
+            <li key={item} className="flex gap-3 rounded-md bg-[var(--mist)] px-3 py-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-dark)]" />
+              <span>{renderInlineMarkdown(item)}</span>
+            </li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\d+\.\s+/, ''));
+        index += 1;
+      }
+      elements.push(
+        <ol key={`${line}-${index}`} className="space-y-2">
+          {items.map((item, itemIndex) => (
+            <li key={item} className="grid grid-cols-[28px_1fr] gap-3 rounded-md border border-[var(--line)] bg-white px-3 py-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-dark)]">
+                {itemIndex + 1}
+              </span>
+              <span>{renderInlineMarkdown(item)}</span>
+            </li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    if (line.endsWith(':') && line.length < 96) {
+      elements.push(
+        <h3 key={`${line}-${index}`} className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-dark)]">
+          {renderInlineMarkdown(stripMarkdown(line))}
+        </h3>,
+      );
+      index += 1;
+      continue;
+    }
+
+    const paragraph: string[] = [line];
+    index += 1;
+    while (
+      index < lines.length &&
+      !/^#{1,6}\s+/.test(lines[index]) &&
+      !/^[-*]\s+/.test(lines[index]) &&
+      !/^\d+\.\s+/.test(lines[index]) &&
+      !(lines[index].endsWith(':') && lines[index].length < 96)
+    ) {
+      paragraph.push(lines[index]);
+      index += 1;
+    }
+
+    elements.push(
+      <p key={`${line}-${index}`} className="text-[15px] leading-7 text-[var(--body)]">
+        {renderInlineMarkdown(paragraph.join(' '))}
+      </p>,
+    );
+  }
 
   return (
     <div className="space-y-4 text-[15px] leading-7 text-[var(--body)]">
-      {blocks.map((block, index) => {
-        const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
-        const isList = lines.every((line) => line.startsWith('*') || line.startsWith('-'));
-
-        if (isList) {
-          return (
-            <ul key={`${block}-${index}`} className="space-y-2">
-              {lines.map((line) => (
-                <li key={line} className="border-l-2 border-[var(--accent)] pl-3">
-                  {renderInlineMarkdown(stripMarkdown(line.replace(/^[-*]\s*/, '')))}
-                </li>
-              ))}
-            </ul>
-          );
-        }
-
-        if (block.endsWith(':') && block.length < 80) {
-          return (
-            <h3 key={`${block}-${index}`} className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--accent-dark)]">
-              {stripMarkdown(block)}
-            </h3>
-          );
-        }
-
-        return <p key={`${block}-${index}`}>{renderInlineMarkdown(block)}</p>;
-      })}
+      {elements.length ? elements : <p>{text}</p>}
     </div>
   );
 }
