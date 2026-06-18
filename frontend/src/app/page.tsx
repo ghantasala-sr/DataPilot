@@ -26,6 +26,8 @@ type QueryPlan = {
   steps?: string[];
   required_tables?: string[];
   metrics?: string[];
+  dimensions?: string[];
+  approved_join_paths?: string[];
   grain?: string;
   filters?: string[];
   visualization?: RecommendedVisualization;
@@ -139,6 +141,8 @@ function normalizePlan(value: unknown): QueryPlan | null {
     steps: normalizeStringList(raw.steps),
     required_tables: normalizeStringList(raw.required_tables),
     metrics: normalizeStringList(raw.metrics),
+    dimensions: normalizeStringList(raw.dimensions),
+    approved_join_paths: normalizeStringList(raw.approved_join_paths),
     grain: typeof raw.grain === 'string' ? raw.grain : undefined,
     filters: normalizeStringList(raw.filters),
     visualization: normalizeVisualization(raw.visualization) ?? undefined,
@@ -229,6 +233,13 @@ function formatCell(value: CellValue) {
   return value;
 }
 
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 function formatBytes(bytes?: number) {
   if (!bytes) return '0 MB';
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
@@ -252,7 +263,18 @@ function inferLabelColumn(rows: QueryRow[]) {
 
 function inferNumberColumn(rows: QueryRow[]) {
   const first = rows[0] ?? {};
-  const priority = ['gross_revenue', 'total_revenue', 'monthly_revenue', 'revenue', 'roi', 'delay_rate', 'total_orders', 'orders'];
+  const priority = [
+    'revenue_change',
+    'gross_revenue',
+    'total_revenue',
+    'monthly_revenue',
+    'revenue',
+    'roi',
+    'delay_rate',
+    'total_orders',
+    'orders',
+    'order_volume_change',
+  ];
   const numericKeys = Object.keys(first).filter((key) => typeof first[key] === 'number');
   return priority.find((key) => numericKeys.includes(key)) || numericKeys[0];
 }
@@ -726,46 +748,81 @@ function MapView({ rows }: { rows: QueryRow[] }) {
   }, [rows]);
   const valueColumn = inferNumberColumn(rows);
   const points = useMemo(() => aggregateMapPoints(rows, stateColumn, valueColumn), [rows, stateColumn, valueColumn]);
-  const maxValue = Math.max(...points.map((point) => point.value), 1);
+  const maxMagnitude = Math.max(...points.map((point) => Math.abs(point.value)), 1);
+  const rankedPoints = [...points].sort((left, right) => Math.abs(right.value) - Math.abs(left.value));
 
   return (
-    <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_230px]">
-      <div className="relative min-h-[360px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--map-bg)]">
-        <svg viewBox="0 0 520 360" className="h-full min-h-[360px] w-full">
+    <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="relative min-h-[430px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--map-bg)]">
+        <div className="absolute left-4 top-4 z-10 rounded-md border border-[var(--line)] bg-white/90 px-3 py-2 backdrop-blur">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Brazil state map</p>
+          <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{valueColumn?.replaceAll('_', ' ') || 'value'} by UF</p>
+        </div>
+        <svg viewBox="0 0 560 430" className="h-full min-h-[430px] w-full">
+          <defs>
+            <filter id="mapShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="10" stdDeviation="10" floodColor="#123126" floodOpacity="0.12" />
+            </filter>
+          </defs>
           <path
-            d="M244 42 318 58 389 112 432 187 409 272 333 321 243 334 157 298 92 223 80 147 134 82Z"
-            fill="#e7efe9"
-            stroke="#cbd9d1"
-            strokeWidth="2"
+            d="M300 27 366 49 420 43 467 78 482 125 519 158 501 204 522 253 482 280 463 332 421 358 391 401 332 384 289 407 244 379 191 377 165 329 111 309 112 261 73 222 102 176 94 128 142 97 167 51 226 61Z"
+            fill="#e6f0ea"
+            filter="url(#mapShadow)"
+            stroke="#bfd2c8"
+            strokeWidth="2.5"
           />
-          <path d="M135 82 244 42 318 58 276 142 179 145Z" fill="#edf4ef" stroke="#d7e2dc" />
-          <path d="M179 145 276 142 324 214 246 250 164 220Z" fill="#f6faf7" stroke="#d7e2dc" />
-          <path d="M276 142 389 112 432 187 324 214Z" fill="#eef6f1" stroke="#d7e2dc" />
-          <path d="M164 220 246 250 243 334 157 298 92 223Z" fill="#eef6f1" stroke="#d7e2dc" />
-          <path d="M246 250 324 214 409 272 333 321 243 334Z" fill="#f8fbf9" stroke="#d7e2dc" />
+          <path d="M226 61 253 129 221 190 166 209 102 176 94 128 142 97 167 51Z" fill="#f2f7f4" stroke="#d5e1dc" />
+          <path d="M253 129 329 111 391 139 389 207 319 230 221 190Z" fill="#edf5f0" stroke="#d5e1dc" />
+          <path d="M391 139 482 125 519 158 501 204 522 253 447 252 389 207Z" fill="#f7faf8" stroke="#d5e1dc" />
+          <path d="M166 209 221 190 319 230 304 305 220 321 165 329 111 309 112 261 73 222Z" fill="#f8fbf9" stroke="#d5e1dc" />
+          <path d="M319 230 389 207 447 252 421 358 391 401 332 384 304 305Z" fill="#eef6f1" stroke="#d5e1dc" />
+          <path d="M220 321 304 305 332 384 289 407 244 379 191 377 165 329Z" fill="#f4f8f6" stroke="#d5e1dc" />
           {points.map((point) => {
-            const radius = 12 + (point.value / maxValue) * 30;
+            const normalized = Math.abs(point.value) / maxMagnitude;
+            const radius = 7 + normalized * 24;
+            const labelVisible = rankedPoints.slice(0, 8).some((ranked) => ranked.state === point.state);
+            const isNegative = point.value < 0;
             return (
               <g key={point.state}>
-                <circle cx={point.x} cy={point.y} r={radius} fill="#57d5b0" opacity="0.26" />
-                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.42, 7)} fill="#087c68" opacity="0.82" />
-                <text x={point.x} y={point.y - radius - 8} textAnchor="middle" className="fill-[var(--ink)] text-[13px] font-semibold">
-                  {point.state}
-                </text>
+                <circle cx={point.x} cy={point.y} r={radius + 5} fill={isNegative ? '#d96d62' : '#57d5b0'} opacity="0.18" />
+                <circle cx={point.x} cy={point.y} r={radius} fill={isNegative ? '#b94b4b' : '#087c68'} opacity={0.42 + normalized * 0.42} />
+                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.36, 4)} fill="#f8fffb" opacity="0.92" />
+                {labelVisible && (
+                  <text x={point.x} y={point.y - radius - 8} textAnchor="middle" className="fill-[var(--ink)] text-[12px] font-semibold">
+                    {point.state}
+                  </text>
+                )}
               </g>
             );
           })}
         </svg>
+        <div className="absolute bottom-4 left-4 right-4 grid gap-2 rounded-md border border-[var(--line)] bg-white/90 p-3 text-xs text-[var(--muted)] backdrop-blur sm:grid-cols-[1fr_auto] sm:items-center">
+          <span>Bubble size and opacity follow the selected measure. States without coordinates are still included in the ranking.</span>
+          <span className="flex items-center gap-3 text-[var(--body)]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-[var(--accent-dark)] opacity-80" />
+              positive
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-[var(--danger)] opacity-80" />
+              negative
+            </span>
+          </span>
+        </div>
       </div>
       <div className="space-y-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Map layer</p>
-          <h3 className="mt-1 text-base font-semibold text-[var(--ink)]">{valueColumn?.replaceAll('_', ' ') || 'value'} by state</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">State ranking</p>
+          <h3 className="mt-1 text-base font-semibold text-[var(--ink)]">Top Brazil states</h3>
         </div>
-        {points.map((point) => (
-          <div key={point.state} className="flex items-center justify-between gap-3 border-b border-[var(--line)] pb-2 text-sm last:border-0">
-            <span className="font-medium text-[var(--body)]">{point.state}</span>
-            <span className="tabular-nums text-[var(--muted)]">{formatCell(point.value)}</span>
+        {rankedPoints.slice(0, 10).map((point, index) => (
+          <div key={point.state} className="grid grid-cols-[32px_1fr_auto] items-center gap-3 border-b border-[var(--line)] pb-2 text-sm last:border-0">
+            <span className="text-xs tabular-nums text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>
+            <span>
+              <span className="font-medium text-[var(--body)]">{point.state}</span>
+              <span className="ml-2 text-xs text-[var(--muted)]">{BRAZIL_STATES[point.state]?.name || 'Brazil state'}</span>
+            </span>
+            <span className="tabular-nums text-[var(--ink)]">{formatCompactNumber(point.value)}</span>
           </div>
         ))}
       </div>
@@ -774,12 +831,6 @@ function MapView({ rows }: { rows: QueryRow[] }) {
 }
 
 function aggregateMapPoints(rows: QueryRow[], stateColumn?: string, valueColumn?: string) {
-  const positions: Record<string, { x: number; y: number }> = {
-    SP: { x: 292, y: 260 },
-    RJ: { x: 332, y: 244 },
-    MG: { x: 286, y: 214 },
-    PR: { x: 259, y: 292 },
-  };
   const totals = new Map<string, number>();
 
   rows.forEach((row) => {
@@ -790,14 +841,45 @@ function aggregateMapPoints(rows: QueryRow[], stateColumn?: string, valueColumn?
     totals.set(state, (totals.get(state) || 0) + value);
   });
 
-  const entries = Array.from(totals.entries()).slice(0, 8);
+  const entries = Array.from(totals.entries());
+  const maxFallbackColumns = 4;
   return entries.map(([state, value], index) => ({
     state,
     value,
-    x: positions[state]?.x ?? 145 + index * 42,
-    y: positions[state]?.y ?? 110 + (index % 3) * 55,
+    x: BRAZIL_STATES[state]?.x ?? 126 + (index % maxFallbackColumns) * 54,
+    y: BRAZIL_STATES[state]?.y ?? 132 + Math.floor(index / maxFallbackColumns) * 48,
   }));
 }
+
+const BRAZIL_STATES: Record<string, { name: string; x: number; y: number }> = {
+  AC: { name: 'Acre', x: 122, y: 171 },
+  AL: { name: 'Alagoas', x: 456, y: 199 },
+  AM: { name: 'Amazonas', x: 190, y: 117 },
+  AP: { name: 'Amapa', x: 338, y: 69 },
+  BA: { name: 'Bahia', x: 401, y: 236 },
+  CE: { name: 'Ceara', x: 431, y: 149 },
+  DF: { name: 'Distrito Federal', x: 338, y: 247 },
+  ES: { name: 'Espirito Santo', x: 410, y: 306 },
+  GO: { name: 'Goias', x: 316, y: 251 },
+  MA: { name: 'Maranhao', x: 378, y: 136 },
+  MG: { name: 'Minas Gerais', x: 365, y: 297 },
+  MS: { name: 'Mato Grosso do Sul', x: 262, y: 302 },
+  MT: { name: 'Mato Grosso', x: 253, y: 226 },
+  PA: { name: 'Para', x: 303, y: 119 },
+  PB: { name: 'Paraiba', x: 462, y: 167 },
+  PE: { name: 'Pernambuco', x: 452, y: 184 },
+  PI: { name: 'Piaui', x: 395, y: 167 },
+  PR: { name: 'Parana', x: 305, y: 349 },
+  RJ: { name: 'Rio de Janeiro', x: 389, y: 332 },
+  RN: { name: 'Rio Grande do Norte', x: 463, y: 148 },
+  RO: { name: 'Rondonia', x: 176, y: 207 },
+  RR: { name: 'Roraima', x: 211, y: 59 },
+  RS: { name: 'Rio Grande do Sul', x: 291, y: 397 },
+  SC: { name: 'Santa Catarina', x: 318, y: 374 },
+  SE: { name: 'Sergipe', x: 449, y: 214 },
+  SP: { name: 'Sao Paulo', x: 340, y: 333 },
+  TO: { name: 'Tocantins', x: 342, y: 183 },
+};
 
 function ResultTable({ rows, compact = false }: { rows: QueryRow[]; compact?: boolean }) {
   const columns = useMemo(() => Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).slice(0, 8), [rows]);
@@ -854,6 +936,7 @@ function PlanningPanel({ result, loading }: { result: QueryResult | null; loadin
   const agents = result?.agents?.length ? result.agents : [];
   const tables = plan?.required_tables?.length ? plan.required_tables : ['awaiting table plan'];
   const metrics = plan?.metrics?.length ? plan.metrics : ['awaiting metric plan'];
+  const dimensions = plan?.dimensions?.length ? plan.dimensions : ['awaiting dimension plan'];
   const visibleAgents = agents.slice(0, 6);
 
   return (
@@ -878,6 +961,7 @@ function PlanningPanel({ result, loading }: { result: QueryResult | null; loadin
       <div className="mb-4 space-y-3">
         <TagGroup label="Tables" values={tables} />
         <TagGroup label="Metrics" values={metrics} />
+        <TagGroup label="Dimensions" values={dimensions} />
       </div>
 
       <div className="space-y-3">

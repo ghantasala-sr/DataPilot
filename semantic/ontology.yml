@@ -7,6 +7,10 @@ entities:
     dataset: datapilot_analytics
     primary_key: customer_id
     description: "Unique purchasing customer account"
+    approved_dimensions:
+      customer_state: "Brazilian federative unit abbreviation used for map and regional grain"
+      customer_city: "Customer city from the Olist address"
+      customer_zip_code_prefix: "Customer ZIP prefix used to join location metadata"
 
   Order:
     table: fact_orders
@@ -60,7 +64,12 @@ entities:
     table: dim_location
     dataset: datapilot_analytics
     primary_key: location_id
-    description: "Geographic location dimension"
+    description: "Brazilian geolocation dimension built from Olist ZIP prefixes"
+    approved_dimensions:
+      geolocation_state: "Brazilian state abbreviation from Olist geolocation"
+      geolocation_city: "Brazilian city from Olist geolocation"
+      geolocation_lat: "Latitude for approximate map enrichment"
+      geolocation_lng: "Longitude for approximate map enrichment"
 
   Date:
     table: dim_date
@@ -131,3 +140,4 @@ relationships:
     join_condition: "dim_customers.customer_zip_code_prefix = dim_location.zip_code_prefix"
     cardinality: "N:1"
     approved: true
+    usage: "Use only when latitude, longitude, city, or ZIP-level geographic enrichment is required; customer_state lives directly on dim_customers."

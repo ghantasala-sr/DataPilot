@@ -40,6 +40,17 @@ terms:
       sales_manager: completed_orders
       operations_manager: total_orders
 
+  order volume:
+    canonical_term: orders
+    definition: "Change or count of customer purchase transactions"
+    domain: operations
+    approved_meanings:
+      - total_orders
+      - completed_orders
+    default_by_role:
+      sales_manager: completed_orders
+      operations_manager: total_orders
+
   customers:
     canonical_term: customers
     definition: "Unique purchasing accounts"
@@ -57,6 +68,9 @@ terms:
       - delivery_time
       - delivery_delay
       - on_time_delivery_rate
+    default_by_role:
+      sales_manager: delivery_delay_rate
+      operations_manager: delivery_delay_rate
 
   refund:
     canonical_term: refund
@@ -76,13 +90,63 @@ terms:
       - campaign_roi
       - campaign_revenue
 
+  geography:
+    canonical_term: geography
+    definition: "Brazilian customer location attributes used for regional analysis"
+    domain: location
+    approved_meanings:
+      - customer_state
+      - customer_city
+      - customer_zip_code_prefix
+
+  state:
+    canonical_term: geography
+    definition: "Brazilian federative unit abbreviation from the Olist customer address"
+    domain: location
+    approved_meanings:
+      - customer_state
+
+  customer state:
+    canonical_term: geography
+    definition: "Brazilian customer state code used as the default map and regional grain"
+    domain: location
+    approved_meanings:
+      - customer_state
+
+  product category:
+    canonical_term: product_category
+    definition: "Translated Olist product category label"
+    domain: product
+    approved_meanings:
+      - product_category_name_english
+      - product_category_name
+
+  product category mix:
+    canonical_term: product_category
+    definition: "Distribution or count of active product categories contributing to revenue"
+    domain: product
+    approved_meanings:
+      - active_product_categories
+      - product_category_name_english
+
 synonyms:
   income: revenue
   turnover: revenue
   bookings: orders
+  order count: orders
+  order_volume: order volume
   purchases: orders
   buyers: customers
   shipping: delivery
+  late delivery: delivery
+  delayed delivery: delivery
   returns: refund
   promotion: campaign
   ad: campaign
+  region: geography
+  map: geography
+  brazil: geography
+  uf: customer state
+  state code: customer state
+  category: product category
+  category mix: product category mix

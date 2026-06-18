@@ -293,6 +293,8 @@ Recovery Agent
 
 The Planning Agent decomposes complicated questions into metric, grain, required tables, filters, comparison logic, and visualization fit before SQL is selected. If the request matches an approved template, DataPilot uses that template first; otherwise, Gemini receives only the approved schema and semantic context.
 
+For geographic questions, the Semantic Agent resolves `state`, `region`, `Brazil`, `UF`, and `customer state` to the governed Olist `customer_state` dimension. It also returns the approved join path, such as `fact_orders.customer_id -> dim_customers.customer_id`, so the UI and SQL path use the same semantic decision.
+
 Example complicated question:
 
 ```text
@@ -300,6 +302,8 @@ Why did gross revenue change month over month by customer state, and is the chan
 ```
 
 For this diagnostic question, DataPilot uses an approved BigQuery template that compares month-over-month gross revenue by customer state and surfaces order volume change, product category mix change, delivery delay rate change, and a primary driver field. The response includes `plan`, `agents`, `complexity`, and `recommended_visualization` so the frontend can show the reasoning path, map/table/chart recommendation, and execution status.
+
+The frontend map uses a Brazil country view with Olist state codes. Bubble size follows the selected measure, and signed change metrics use positive/negative color treatment for faster diagnosis.
 
 ---
 
@@ -750,7 +754,13 @@ Response:
   "plan": {
     "grain": "month x customer_state",
     "required_tables": ["fact_orders", "fact_order_items", "dim_products", "dim_customers"],
-    "metrics": ["gross_revenue", "order_count", "delivery_delay_rate"]
+    "metrics": ["gross_revenue", "order_count", "delivery_delay_rate"],
+    "dimensions": ["calendar_month", "customer_state", "product_category_name_english"],
+    "approved_join_paths": [
+      "fact_orders.customer_id -> dim_customers.customer_id",
+      "fact_orders.order_id -> fact_order_items.order_id",
+      "fact_order_items.product_id -> dim_products.product_id"
+    ]
   },
   "agents": [
     {

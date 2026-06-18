@@ -18,6 +18,8 @@ class AgentCoordinator:
         normalized = question.lower()
         required_tables = self._infer_tables(normalized)
         metrics = self._infer_metrics(normalized, metric)
+        dimensions = self._infer_dimensions(normalized)
+        join_paths = self._infer_join_paths(required_tables)
         visualization = self._recommend_visualization(normalized)
         complexity = self._classify_complexity(normalized, template, len(required_tables), len(metrics))
 
@@ -34,6 +36,8 @@ class AgentCoordinator:
             ],
             "required_tables": required_tables,
             "metrics": metrics,
+            "dimensions": dimensions,
+            "approved_join_paths": join_paths,
             "grain": self._infer_grain(normalized),
             "filters": self._infer_filters(normalized),
             "visualization": visualization,
@@ -60,8 +64,11 @@ class AgentCoordinator:
                 "agent": "Semantic Agent",
                 "role": "Maps words to governed business definitions.",
                 "status": "completed",
-                "summary": metric.get("metric_name", "No explicit metric resolved") if metric else "No explicit metric resolved",
-                "evidence": [f"{len(policies)} policy rule(s) considered."],
+                "summary": self._semantic_summary(plan, metric),
+                "evidence": [
+                    f"{len(policies)} policy rule(s) considered.",
+                    *(plan.get("approved_join_paths") or ["No multi-table join path required."]),
+                ],
             },
             {
                 "agent": "SQL Agent",
@@ -190,6 +197,32 @@ class AgentCoordinator:
                 metrics.append(metric_name)
         return metrics or ["row_count"]
 
+    def _infer_dimensions(self, normalized: str) -> list[str]:
+        dimensions: list[str] = []
+        if any(term in normalized for term in ["month", "monthly", "month over month"]):
+            dimensions.append("calendar_month")
+        if any(term in normalized for term in ["state", "region", "geography", "map", "brazil", "uf"]):
+            dimensions.append("customer_state")
+        if any(term in normalized for term in ["product category", "category", "category mix", "mix"]):
+            dimensions.append("product_category_name_english")
+        if any(term in normalized for term in ["campaign", "channel"]):
+            dimensions.append("campaign_channel")
+        return dimensions or ["aggregate"]
+
+    def _infer_join_paths(self, required_tables: list[str]) -> list[str]:
+        join_paths: list[str] = []
+        if "dim_customers" in required_tables:
+            join_paths.append("fact_orders.customer_id -> dim_customers.customer_id")
+        if "fact_order_items" in required_tables:
+            join_paths.append("fact_orders.order_id -> fact_order_items.order_id")
+        if "dim_products" in required_tables:
+            join_paths.append("fact_order_items.product_id -> dim_products.product_id")
+        if "fact_campaign_attribution" in required_tables:
+            join_paths.append("fact_campaign_attribution.order_id -> fact_orders.order_id")
+        if "dim_campaigns" in required_tables:
+            join_paths.append("dim_campaigns.campaign_id -> fact_campaign_attribution.campaign_id")
+        return join_paths
+
     def _infer_grain(self, normalized: str) -> str:
         if "month" in normalized:
             if "state" in normalized:
@@ -218,8 +251,8 @@ class AgentCoordinator:
         return filters
 
     def _recommend_visualization(self, normalized: str) -> dict[str, str]:
-        if any(term in normalized for term in ["state", "region", "map"]):
-            return {"type": "map", "reason": "The question includes a geographic state dimension.", "geo": "customer_state"}
+        if any(term in normalized for term in ["state", "region", "map", "brazil", "uf"]):
+            return {"type": "map", "reason": "The question resolves to Brazil customer-state geography.", "geo": "customer_state"}
         if any(term in normalized for term in ["month", "trend", "over time"]):
             return {"type": "chart", "reason": "The question includes a time-series grain.", "x": "month"}
         if any(term in normalized for term in ["why", "driver", "explained"]):
@@ -232,6 +265,11 @@ class AgentCoordinator:
         if complexity == "investigative":
             return "Break the question into metric, grain, comparison, and driver measures before governed SQL generation."
         return "Resolve semantic context, generate governed SQL, validate, execute, and explain."
+
+    def _semantic_summary(self, plan: dict[str, Any], metric: dict | None) -> str:
+        metric_name = metric.get("metric_name", "No explicit metric resolved") if metric else "No explicit metric resolved"
+        dimensions = ", ".join(plan.get("dimensions") or ["aggregate"])
+        return f"{metric_name}; dimensions: {dimensions}."
 
 
 agent_coordinator = AgentCoordinator()

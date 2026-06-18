@@ -133,6 +133,21 @@ context_rules:
     priority: 1
 
   - metric_id: delivery_delay_rate
+    user_role: sales_manager
+    trigger_words: [delay, late, shipping, delivery]
+    priority: 2
+
+  - metric_id: completed_orders
+    user_role: sales_manager
+    trigger_words: [order volume, orders, order count, purchases]
+    priority: 2
+
+  - metric_id: gross_revenue
+    user_role: sales_manager
+    trigger_words: [gross revenue, revenue change, sales change, product category mix]
+    priority: 1
+
+  - metric_id: delivery_delay_rate
     user_role: operations_manager
     trigger_words: [delay, late, shipping, delivery]
     priority: 1
