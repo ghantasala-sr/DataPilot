@@ -1,50 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  --background: #e9edf2;
-  --foreground: #211a28;
-  --ink: #211a28;
-  --body: #34303a;
-  --muted: #70717a;
-  --line: #d4d9e1;
-  --mist: #e2e7ee;
-  --surface: #fbf8f1;
-  --surface-raised: #fffdf8;
-  --nav: #2a2033;
-  --map-bg: #e5eaf1;
-  --accent: #c8792a;
-  --accent-dark: #7a3e14;
-  --accent-strong: #a95f1b;
-  --accent-soft: #f6e2c5;
-  --utility: #2d6173;
-  --utility-soft: #dcebf0;
+  --background: #f6f8f5;
+  --foreground: #101820;
+  --ink: #101820;
+  --body: #26333f;
+  --muted: #64706b;
+  --line: #dce4df;
+  --mist: #edf3ef;
+  --map-bg: #f3f7f4;
+  --accent: #57d5b0;
+  --accent-dark: #087c68;
+  --accent-strong: #42c29e;
+  --accent-soft: #dff8ef;
   --danger: #b94b4b;
-  --danger-line: #efcac4;
-  --danger-soft: #fff0ed;
+  --danger-line: #f0cccc;
+  --danger-soft: #fff0ef;
   --warning: #9b651c;
-  --warning-line: #e8d2aa;
-  --warning-soft: #fff5df;
-  --success: #2d6173;
-  --success-line: #b7d6df;
-  --success-soft: #e2f2f6;
-  --code: #f4d3a8;
+  --warning-line: #ecd7b6;
+  --warning-soft: #fff6e6;
+  --success: #087c68;
+  --success-line: #bcecdf;
+  --success-soft: #e6fbf4;
+  --code: #d5f7ea;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Aptos", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
-  background:
-    linear-gradient(90deg, rgba(42, 32, 51, 0.05) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(42, 32, 51, 0.04) 1px, transparent 1px),
-    var(--background);
-  background-size: 40px 40px;
+  background: var(--background);
   color: var(--foreground);
-  font-family: "Aptos", "Segoe UI", Arial, Helvetica, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 button,
@@ -55,16 +46,4 @@ input {
 ::selection {
   background: var(--accent-soft);
   color: var(--ink);
-}
-
-.audit-ribbon {
-  position: relative;
-}
-
-.audit-ribbon::before {
-  background: linear-gradient(180deg, var(--accent), var(--utility));
-  content: "";
-  inset: 0 auto 0 0;
-  position: absolute;
-  width: 5px;
 }
