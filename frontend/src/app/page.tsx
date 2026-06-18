@@ -448,25 +448,25 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 py-4 sm:px-5 xl:px-6">
-        <header className="sticky top-3 z-30 rounded-xl border border-[var(--line)] bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
+        <header className="sticky top-3 z-30 rounded-xl border border-black/10 bg-[var(--nav)] px-4 py-3 text-white shadow-lg shadow-black/10">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-[220px] items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--ink)] text-sm font-semibold text-white shadow-sm">
+              <div className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--accent)] text-sm font-semibold text-[var(--ink)] shadow-sm">
                 DP
               </div>
               <div>
-                <h1 className="text-xl font-semibold tracking-[0] text-[var(--ink)]">DataPilot</h1>
-                <p className="text-xs text-[var(--muted)]">Governed analytics workspace</p>
+                <h1 className="text-xl font-semibold tracking-[0] text-white">DataPilot</h1>
+                <p className="text-xs text-white/60">Governed analytics workspace</p>
               </div>
             </div>
 
-            <nav aria-label="Workspace navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto rounded-lg bg-[var(--mist)] p-1 text-sm md:order-2 md:w-auto">
+            <nav aria-label="Workspace navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto rounded-lg bg-white/10 p-1 text-sm md:order-2 md:w-auto">
               {['Ask', 'Visualize', 'Semantic plan', 'SQL'].map((item, index) => (
                 <button
                   key={item}
                   type="button"
                   className={`whitespace-nowrap rounded-md px-3 py-2 transition ${
-                    index === 0 ? 'bg-white text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:bg-white/70 hover:text-[var(--ink)]'
+                    index === 0 ? 'bg-[var(--accent)] text-[var(--ink)] shadow-sm' : 'text-white/65 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   {item}
@@ -474,7 +474,7 @@ export default function Home() {
               ))}
             </nav>
 
-            <div className="order-2 flex items-center gap-2 text-xs text-[var(--muted)] md:order-3">
+            <div className="order-2 flex items-center gap-2 text-xs text-white/65 md:order-3">
               <StatusBadge tone="neutral" label="Sales manager" />
               <StatusBadge tone="ok" label="Admin scope" />
             </div>
@@ -515,7 +515,7 @@ function StatusBadge({ label, tone }: { label: string; tone: 'ok' | 'warn' | 'da
     ok: 'border-[var(--success-line)] bg-[var(--success-soft)] text-[var(--success)]',
     warn: 'border-[var(--warning-line)] bg-[var(--warning-soft)] text-[var(--warning)]',
     danger: 'border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger)]',
-    neutral: 'border-[var(--line)] bg-white text-[var(--muted)]',
+    neutral: 'border-white/15 bg-white/10 text-current',
   }[tone];
 
   return <span className={`rounded-full border px-2.5 py-1 ${toneClass}`}>{label}</span>;
@@ -539,24 +539,24 @@ function ChatWindow({
   endRef: RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <aside className="flex min-h-[720px] flex-col rounded-lg border border-[var(--line)] bg-white">
-      <div className="border-b border-[var(--line)] px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Chat window</p>
-        <h2 className="mt-1 text-lg font-semibold text-[var(--ink)]">Ask, refine, compare</h2>
+    <aside className="flex min-h-[720px] flex-col overflow-hidden rounded-xl bg-[var(--nav)] text-white shadow-lg shadow-black/10">
+      <div className="border-b border-white/10 px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Chat window</p>
+        <h2 className="mt-1 text-lg font-semibold text-white">Ask, refine, compare</h2>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.length ? (
           messages.map((message) => <ChatBubble key={message.id} message={message} />)
         ) : (
-          <div className="rounded-lg border border-dashed border-[var(--line)] bg-[var(--mist)] px-4 py-5 text-sm text-[var(--muted)]">
+          <div className="rounded-lg border border-dashed border-white/15 bg-white/5 px-4 py-5 text-sm text-white/55">
             Start with a business question. Follow-ups stay here so the workspace reads like an analysis session.
           </div>
         )}
         {loading && (
-          <div className="rounded-lg border border-[var(--line)] bg-[var(--mist)] px-4 py-3 text-sm text-[var(--body)]">
+          <div className="rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/75">
             <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent-dark)]" />
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
               Resolving semantics, SQL, cost, and visualization.
             </span>
           </div>
@@ -564,7 +564,7 @@ function ChatWindow({
         <div ref={endRef} />
       </div>
 
-      <div className="border-t border-[var(--line)] p-4">
+      <div className="border-t border-white/10 bg-white/[0.03] p-4">
         <div className="mb-3 flex flex-wrap gap-2">
           {sampleQuestions.map((question) => (
             <button
@@ -572,7 +572,7 @@ function ChatWindow({
               type="button"
               disabled={loading}
               onClick={() => onPrompt(question)}
-              className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white/60 transition hover:border-[var(--accent)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {question}
             </button>
@@ -583,13 +583,13 @@ function ChatWindow({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Ask a governed analytics question..."
-            className="min-h-24 resize-none rounded-md border border-[var(--line)] bg-[var(--mist)] px-3 py-3 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]"
+            className="min-h-24 resize-none rounded-md border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-[var(--accent)] focus:bg-white/15 focus:ring-4 focus:ring-[var(--accent)]/20"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !query.trim()}
-            className="h-11 rounded-md bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--accent-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-11 rounded-md bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--accent-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--accent)]/25 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? 'Analyzing' : 'Send to DataPilot'}
           </button>
@@ -611,7 +611,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
             ? 'bg-[var(--ink)] text-white'
             : isError
               ? 'border border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger)]'
-              : 'border border-[var(--line)] bg-white text-[var(--body)]'
+              : 'border border-white/10 bg-white/95 text-[var(--body)]'
         }`}
       >
         <p className="leading-6">{message.content}</p>
@@ -631,7 +631,7 @@ function AnswerPanel({
   loading: boolean;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">AI answer</p>
@@ -688,7 +688,7 @@ function FormattedAnswer({ text }: { text: string }) {
         <ul key={`${line}-${index}`} className="space-y-2">
           {items.map((item) => (
             <li key={item} className="flex gap-3 rounded-md bg-[var(--mist)] px-3 py-2">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-dark)]" />
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
               <span>{renderInlineMarkdown(item)}</span>
             </li>
           ))}
@@ -706,7 +706,7 @@ function FormattedAnswer({ text }: { text: string }) {
       elements.push(
         <ol key={`${line}-${index}`} className="space-y-2">
           {items.map((item, itemIndex) => (
-            <li key={item} className="grid grid-cols-[28px_1fr] gap-3 rounded-md border border-[var(--line)] bg-white px-3 py-2">
+            <li key={item} className="grid grid-cols-[28px_1fr] gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-2">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-dark)]">
                 {itemIndex + 1}
               </span>
@@ -772,7 +772,7 @@ function VisualizationAgent({
   const recommendation = result?.recommended_visualization ?? result?.plan?.visualization;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
+    <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Visualization agent</p>
@@ -787,7 +787,7 @@ function VisualizationAgent({
               type="button"
               onClick={() => setMode(nextMode)}
               className={`rounded px-3 py-1.5 capitalize transition ${
-                mode === nextMode ? 'bg-white text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'
+                mode === nextMode ? 'bg-[var(--accent)] text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
               {nextMode}
@@ -859,7 +859,7 @@ function MapView({ rows }: { rows: QueryRow[] }) {
   return (
     <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_260px]">
       <div className="relative min-h-[430px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--map-bg)]">
-        <div className="absolute left-4 top-4 z-10 rounded-md border border-[var(--line)] bg-white/90 px-3 py-2 backdrop-blur">
+        <div className="absolute left-4 top-4 z-10 rounded-md border border-[var(--line)] bg-[var(--surface)]/90 px-3 py-2 backdrop-blur">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Brazil state map</p>
           <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{valueColumn?.replaceAll('_', ' ') || 'value'} by UF</p>
         </div>
@@ -871,17 +871,17 @@ function MapView({ rows }: { rows: QueryRow[] }) {
           </defs>
           <path
             d="M300 27 366 49 420 43 467 78 482 125 519 158 501 204 522 253 482 280 463 332 421 358 391 401 332 384 289 407 244 379 191 377 165 329 111 309 112 261 73 222 102 176 94 128 142 97 167 51 226 61Z"
-            fill="#e6f0ea"
+            fill="#e8edf3"
             filter="url(#mapShadow)"
-            stroke="#bfd2c8"
+            stroke="#c5cfda"
             strokeWidth="2.5"
           />
-          <path d="M226 61 253 129 221 190 166 209 102 176 94 128 142 97 167 51Z" fill="#f2f7f4" stroke="#d5e1dc" />
-          <path d="M253 129 329 111 391 139 389 207 319 230 221 190Z" fill="#edf5f0" stroke="#d5e1dc" />
-          <path d="M391 139 482 125 519 158 501 204 522 253 447 252 389 207Z" fill="#f7faf8" stroke="#d5e1dc" />
-          <path d="M166 209 221 190 319 230 304 305 220 321 165 329 111 309 112 261 73 222Z" fill="#f8fbf9" stroke="#d5e1dc" />
-          <path d="M319 230 389 207 447 252 421 358 391 401 332 384 304 305Z" fill="#eef6f1" stroke="#d5e1dc" />
-          <path d="M220 321 304 305 332 384 289 407 244 379 191 377 165 329Z" fill="#f4f8f6" stroke="#d5e1dc" />
+          <path d="M226 61 253 129 221 190 166 209 102 176 94 128 142 97 167 51Z" fill="#f5f7fa" stroke="#d7dee7" />
+          <path d="M253 129 329 111 391 139 389 207 319 230 221 190Z" fill="#eef2f6" stroke="#d7dee7" />
+          <path d="M391 139 482 125 519 158 501 204 522 253 447 252 389 207Z" fill="#f9fafc" stroke="#d7dee7" />
+          <path d="M166 209 221 190 319 230 304 305 220 321 165 329 111 309 112 261 73 222Z" fill="#fbfcfd" stroke="#d7dee7" />
+          <path d="M319 230 389 207 447 252 421 358 391 401 332 384 304 305Z" fill="#f0f4f8" stroke="#d7dee7" />
+          <path d="M220 321 304 305 332 384 289 407 244 379 191 377 165 329Z" fill="#f6f8fb" stroke="#d7dee7" />
           {points.map((point) => {
             const normalized = Math.abs(point.value) / maxMagnitude;
             const radius = 7 + normalized * 24;
@@ -889,9 +889,9 @@ function MapView({ rows }: { rows: QueryRow[] }) {
             const isNegative = point.value < 0;
             return (
               <g key={point.state}>
-                <circle cx={point.x} cy={point.y} r={radius + 5} fill={isNegative ? '#d96d62' : '#57d5b0'} opacity="0.18" />
-                <circle cx={point.x} cy={point.y} r={radius} fill={isNegative ? '#b94b4b' : '#087c68'} opacity={0.42 + normalized * 0.42} />
-                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.36, 4)} fill="#f8fffb" opacity="0.92" />
+                <circle cx={point.x} cy={point.y} r={radius + 5} fill={isNegative ? '#b94b4b' : '#ff7358'} opacity="0.18" />
+                <circle cx={point.x} cy={point.y} r={radius} fill={isNegative ? '#b94b4b' : '#b63b27'} opacity={0.42 + normalized * 0.42} />
+                <circle cx={point.x} cy={point.y} r={Math.max(radius * 0.36, 4)} fill="#fff7f4" opacity="0.92" />
                 {labelVisible && (
                   <text x={point.x} y={point.y - radius - 8} textAnchor="middle" className="fill-[var(--ink)] text-[12px] font-semibold">
                     {point.state}
@@ -901,11 +901,11 @@ function MapView({ rows }: { rows: QueryRow[] }) {
             );
           })}
         </svg>
-        <div className="absolute bottom-4 left-4 right-4 grid gap-2 rounded-md border border-[var(--line)] bg-white/90 p-3 text-xs text-[var(--muted)] backdrop-blur sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="absolute bottom-4 left-4 right-4 grid gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)]/90 p-3 text-xs text-[var(--muted)] backdrop-blur sm:grid-cols-[1fr_auto] sm:items-center">
           <span>Bubble size and opacity follow the selected measure. States without coordinates are still included in the ranking.</span>
           <span className="flex items-center gap-3 text-[var(--body)]">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-[var(--accent-dark)] opacity-80" />
+              <span className="h-3 w-3 rounded-full bg-[var(--accent)] opacity-80" />
               positive
             </span>
             <span className="inline-flex items-center gap-1.5">
@@ -1022,7 +1022,7 @@ function RunStatus({ result }: { result: QueryResult | null }) {
   const freshnessLabel = result?.freshness?.status || result?.freshness?.message || 'Freshness pending';
 
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
       <h2 className="mb-4 text-sm font-semibold text-[var(--ink)]">Run status</h2>
       <div className="grid gap-3 text-sm">
         <StatusRow label="API" value="same-origin /api/query" />
@@ -1045,7 +1045,7 @@ function PlanningPanel({ result, loading }: { result: QueryResult | null; loadin
   const visibleAgents = agents.slice(0, 6);
 
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-[var(--ink)]">Planning agents</h2>
@@ -1139,7 +1139,7 @@ function SemanticPanel({ result }: { result: QueryResult | null }) {
     : ['Metric definitions are resolved server-side.', 'Approved join paths are required before SQL execution.'];
 
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
       <h2 className="mb-4 text-sm font-semibold text-[var(--ink)]">Semantic context</h2>
       <div className="mb-4 rounded-md bg-[var(--mist)] p-3">
         <p className="text-xs text-[var(--muted)]">Metric definition</p>
@@ -1158,7 +1158,7 @@ function SemanticPanel({ result }: { result: QueryResult | null }) {
 
 function SqlPanel({ sql }: { sql: string }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--ink)] text-white">
+    <section className="overflow-hidden rounded-xl border border-black/10 bg-[var(--nav)] text-white shadow-sm">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
         <h2 className="text-sm font-semibold">Generated SQL</h2>
         <span className="text-xs text-white/55">BigQuery</span>
@@ -1180,7 +1180,7 @@ function FeedbackButtons({
   disabled: boolean;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
       <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">Feedback</h2>
       <div className="grid grid-cols-2 gap-2">
         <button
